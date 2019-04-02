@@ -1,0 +1,57 @@
+//從 spring boot 來, buildscript 要在 plugin 前面
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.0.5.RELEASE")
+    }
+}
+
+plugins {
+    id 'java'
+    id 'org.web3j' version '4.1.2'
+}
+
+group 'org.web3j'
+version '0.1.2'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+
+bootJar {
+    baseName = 'gs-spring-boot'
+    version =  '0.1.0'
+}
+//--//
+
+repositories {
+    mavenCentral()
+}
+
+web3j {
+    generatedPackageName = 'org.web3j.sample.contracts.generated'
+    excludedContracts = ['Mortal']
+}
+
+ext {
+    web3jVersion = '4.1.1'
+    logbackVersion = '1.2.3'
+    junitVersion = '4.12'
+}
+
+dependencies {
+    implementation "org.web3j:core:$web3jVersion",
+            "ch.qos.logback:logback-core:$logbackVersion",
+            "ch.qos.logback:logback-classic:$logbackVersion"
+    testImplementation "junit:junit:$junitVersion"
+    
+    compile("org.springframework.boot:spring-boot-starter-web")
+    testCompile("junit:junit")
+}
