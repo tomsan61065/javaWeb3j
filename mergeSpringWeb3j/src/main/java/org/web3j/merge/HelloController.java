@@ -1,4 +1,7 @@
-package org.web3j.sample;
+package org.web3j.merge;
+
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.math.BigDecimal;
 
@@ -6,72 +9,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.web3j.crypto.Credentials;
-import org.web3j.crypto.WalletUtils;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
-import org.web3j.sample.contracts.generated.Greeter;
+import org.web3j.merge.contracts.generated.Greeter;
 import org.web3j.tx.Transfer;
 import org.web3j.tx.gas.ContractGasProvider;
 import org.web3j.tx.gas.DefaultGasProvider;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
 
-import java.util.Arrays;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ApplicationContext;
-
-/**
- * A simple web3j application that demonstrates a number of core features of web3j:
- *
- * <ol>
- *     <li>Connecting to a node on the Ethereum network</li>
- *     <li>Loading an Ethereum wallet file</li>
- *     <li>Sending Ether from one address to another</li>
- *     <li>Deploying a smart contract to the network</li>
- *     <li>Reading a value from the deployed smart contract</li>
- *     <li>Updating a value in the deployed smart contract</li>
- *     <li>Viewing an event logged by the smart contract</li>
- * </ol>
- *
- * <p>To run this demo, you will need to provide:
- *
- * <ol>
- *     <li>Ethereum client (or node) endpoint. The simplest thing to do is
- *     <a href="https://infura.io/register.html">request a free access token from Infura</a></li>
- *     <li>A wallet file. This can be generated using the web3j
- *     <a href="https://docs.web3j.io/command_line.html">command line tools</a></li>
- *     <li>Some Ether. This can be requested from the
- *     <a href="https://www.rinkeby.io/#faucet">Rinkeby Faucet</a></li>
- * </ol>
- *
- * <p>For further background information, refer to the project README.
- */
-@SpringBootApplication
-public class Application {
+@RestController
+public class HelloController {
 
     private static final Logger log = LoggerFactory.getLogger(Application.class);
-
-    public static void main(String[] args) throws Exception {
-        new Application().run();
-        
-        ApplicationContext ctx = SpringApplication.run(Application.class, args);
-        
-        System.out.println("Let's inspect the beans provided by Spring Boot:");
-        
-        String[] beanNames = ctx.getBeanDefinitionNames();
-        Arrays.sort(beanNames);
-        for (String beanName : beanNames) {
-            System.out.println(beanName);
-        }
-    }
-
-    private void run() throws Exception {
-
-        // We start by creating a new web3j instance to connect to remote nodes on the network.
-        // Note: if using web3j Android, use Web3jFactory.build(...
+    
+    @RequestMapping("/")
+    public String index() throws Exception{
         Web3j web3j = Web3j.build(new HttpService());  // for local host
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
@@ -83,7 +37,7 @@ public class Application {
                         "<password>",
                         "/path/to/<walletfile>");*/
         //要連接 ganache 就沒有 wallet，直接給 privateKey
-        Credentials credentials = Credentials.create("0x14d5f34f6f5a69260d0e05f18b8f80858f69ebc9f952a9bdcd598e0621de75a7");
+        Credentials credentials = Credentials.create("0xabdeecf746c83aa6564d0781f52cd80192a4e3810921236b32b0a920f346214c");
         log.info("Credentials loaded");
 
         // FIXME: Request some Ether for the Rinkeby test network at https://www.rinkeby.io/#faucet
@@ -105,11 +59,11 @@ public class Application {
                 credentials,
                 contractGasProvider,
                 "test"
-                ).send();
+        ).send();
 
         String contractAddress = contract.getContractAddress();
         log.info("Smart contract deployed to address " + contractAddress);
-     //   log.info("View contract at https://rinkeby.etherscan.io/address/" + contractAddress);
+        //   log.info("View contract at https://rinkeby.etherscan.io/address/" + contractAddress);
 
         log.info("Value stored in remote smart contract: " + contract.greet().send());
 
@@ -128,5 +82,7 @@ public class Application {
             log.info("Indexed event previous value: " + Numeric.toHexString(event.oldGreetingIdx)
                     + ", new value: " + Numeric.toHexString(event.newGreetingIdx));
         }
+        return "Greetings from Spring Boot!";
     }
+    
 }

@@ -1,4 +1,4 @@
-package org.web3j.sample.contracts.generated;
+package org.web3j.merge.contracts.generated;
 
 import io.reactivex.Flowable;
 import java.math.BigInteger;

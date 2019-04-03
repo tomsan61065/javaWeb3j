@@ -1,4 +1,4 @@
-package org.web3j.sample;
+package org.web3j.merge;
 
 import org.junit.Test;
 
