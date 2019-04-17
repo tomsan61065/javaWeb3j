@@ -22,11 +22,12 @@ import org.web3j.utils.Numeric;
 @RestController
 public class HelloController {
 
+    private Web3j web3j = Web3j.build(new HttpService());  // for local host
     private static final Logger log = LoggerFactory.getLogger(Application.class);
     
     @RequestMapping("/")
     public String index() throws Exception{
-        Web3j web3j = Web3j.build(new HttpService());  // for local host
+
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
 
@@ -37,7 +38,7 @@ public class HelloController {
                         "<password>",
                         "/path/to/<walletfile>");*/
         //要連接 ganache 就沒有 wallet，直接給 privateKey
-        Credentials credentials = Credentials.create("0xabdeecf746c83aa6564d0781f52cd80192a4e3810921236b32b0a920f346214c");
+        Credentials credentials = Credentials.create("0x3a2b91d1cc8da46bfbf03f8b92aebbbbac452243195e0c4511bd48dd3a8c0648");
         log.info("Credentials loaded");
 
         // FIXME: Request some Ether for the Rinkeby test network at https://www.rinkeby.io/#faucet

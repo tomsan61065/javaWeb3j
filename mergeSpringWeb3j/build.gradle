@@ -45,7 +45,6 @@ ext {
     logbackVersion = '1.2.3'
     junitVersion = '4.12'
 }
-
 dependencies {
     implementation "org.web3j:core:$web3jVersion",
             "ch.qos.logback:logback-core:$logbackVersion",
