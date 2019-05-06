@@ -19,7 +19,40 @@ import org.web3j.tx.gas.DefaultGasProvider;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
 
-@RestController
+import org.web3j.merge.contracts.generated.RequestList;
+import org.web3j.merge.contracts.generated.AssetList;
+
+import org.web3j.merge.MemberAccount; //引入自定義結構 MemberAccount
+import org.springframework.beans.factory.annotation.Autowired; //使用 @Autowired
+
+/**
+ * A simple web3j application that demonstrates a number of core features of web3j:
+ *
+ * <ol>
+ *     <li>Connecting to a node on the Ethereum network</li>
+ *     <li>Loading an Ethereum wallet file</li>
+ *     <li>Sending Ether from one address to another</li>
+ *     <li>Deploying a smart contract to the network</li>
+ *     <li>Reading a value from the deployed smart contract</li>
+ *     <li>Updating a value in the deployed smart contract</li>
+ *     <li>Viewing an event logged by the smart contract</li>
+ * </ol>
+ *
+ * <p>To run this demo, you will need to provide:
+ *
+ * <ol>
+ *     <li>Ethereum client (or node) endpoint. The simplest thing to do is
+ *     <a href="https://infura.io/register.html">request a free access token from Infura</a></li>
+ *     <li>A wallet file. This can be generated using the web3j
+ *     <a href="https://docs.web3j.io/command_line.html">command line tools</a></li>
+ *     <li>Some Ether. This can be requested from the
+ *     <a href="https://www.rinkeby.io/#faucet">Rinkeby Faucet</a></li>
+ * </ol>
+ *
+ * <p>For further background information, refer to the project README.
+ */
+
+@RestController //MVC
 public class HelloController {
 
     private Web3j web3j = Web3j.build(new HttpService());  // for local host
@@ -85,5 +118,19 @@ public class HelloController {
         }
         return "Greetings from Spring Boot!";
     }
-    
+ 
+ //   @Autowired
+ //   MemberAccount memberAccount;
+
+
+    @RequestMapping("/memberApi/memberTest")
+    public MemberAccount memberTest(){
+        MemberAccount MA = new MemberAccount();
+        MA.setAddress("taipei city");
+        MA.setCellphone("09123456789");
+        MA.setEmail("test@gmail.com");
+        MA.setId(1);
+        MA.setPassword("123456789");
+        return MA;
+    }
 }
