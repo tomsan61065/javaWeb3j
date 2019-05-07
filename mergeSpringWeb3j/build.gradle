@@ -1,5 +1,5 @@
 //從 spring boot 來, buildscript 要在 plugin 前面
-buildscript {
+buildscript { //這是給 build.gradle 自己使用的，因為使用 apply plugin 的舊寫法
     repositories {
         mavenCentral()
     }
@@ -53,5 +53,6 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     
     compile("org.springframework.boot:spring-boot-starter-web")
+    compile("org.springframework.boot:spring-boot-starter-thymeleaf")
     testCompile("junit:junit")
 }

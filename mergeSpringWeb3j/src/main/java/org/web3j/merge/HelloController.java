@@ -1,13 +1,19 @@
 package org.web3j.merge;
 
-import org.springframework.web.bind.annotation.RestController;
+//spring boot
+//import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+//web3j
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
@@ -25,6 +31,10 @@ import org.web3j.merge.contracts.generated.AssetList;
 import org.web3j.merge.MemberAccount; //引入自定義結構 MemberAccount
 import org.springframework.beans.factory.annotation.Autowired; //使用 @Autowired
 
+//引入 contract instance (abi?)
+import org.web3j.merge.contracts.generated.AssetList;
+import org.web3j.merge.contracts.generated.RequestList;
+import org.web3j.merge.contracts.generated.TxValidation;
 /**
  * A simple web3j application that demonstrates a number of core features of web3j:
  *
@@ -51,25 +61,44 @@ import org.springframework.beans.factory.annotation.Autowired; //使用 @Autowir
  *
  * <p>For further background information, refer to the project README.
  */
-
-@RestController //MVC
+//https://github.com/web3j/web3j
+@Controller //MVC
 public class HelloController {
+    String ethereumUri = "http://140.119.101.130:7575";
 
     private Web3j web3j = Web3j.build(new HttpService());  // for local host
     private static final Logger log = LoggerFactory.getLogger(Application.class);
-    
+
+    String NotaryAgent = "0x76ac34807210d52fcbfc0412cf4da5c672214752";
+
+/*
+    YourSmartContract contract = YourSmartContract.load(
+        "0x<address>|<ensName>", <web3j>, <credentials>, GAS_PRICE, GAS_LIMIT);
+
+    let AssetList_ABI = require("../../Contract/AssetList_ABI.js");
+    let AssetList_Address = "0x0bfd6d60bdadbbd3dfed87afbe505761708973c4";
+    let AssetList = new web3.eth.Contract(AssetList_ABI, AssetList_Address);
+
+    String AssetList_Address = "0x0bfd6d60bdadbbd3dfed87afbe505761708973c4";
+    AssetList assetListContract = AssetList.load(AssetList_Address, web3j, credentials, GAS_PRICE, GAS_LIMIT);*/
+
+    public static final String AliceETH = "0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2";
+    public static final String BobETH = "0xbe36543da0bc51f31cd3f915088d5d704572d047";
+
+
     @RequestMapping("/")
     public String index() throws Exception{
 
+        /*
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
 
         // We then need to load our Ethereum wallet file
         // FIXME: Generate a new wallet file using the web3j command line tools https://docs.web3j.io/command_line.html
-     /*   Credentials credentials =
+        Credentials credentials =
                 WalletUtils.loadCredentials(
                         "<password>",
-                        "/path/to/<walletfile>");*/
+                        "/path/to/<walletfile>");
         //要連接 ganache 就沒有 wallet，直接給 privateKey
         Credentials credentials = Credentials.create("0x3a2b91d1cc8da46bfbf03f8b92aebbbbac452243195e0c4511bd48dd3a8c0648");
         log.info("Credentials loaded");
@@ -115,8 +144,10 @@ public class HelloController {
                     + ", new value: " + event.newGreeting);
             log.info("Indexed event previous value: " + Numeric.toHexString(event.oldGreetingIdx)
                     + ", new value: " + Numeric.toHexString(event.newGreetingIdx));
-        }
-        return "Greetings from Spring Boot!";
+        }*/
+
+
+        return "Home.html";
     }
  
  //   @Autowired
@@ -132,5 +163,18 @@ public class HelloController {
         MA.setId(1);
         MA.setPassword("123456789");
         return MA;
+    }
+
+    @RequestMapping("/copy")
+    public String copy() throws Exception{
+        // FIXME: Generate a new wallet file using the web3j command line tools https://docs.web3j.io/command_line.html
+     /*   Credentials credentials =
+                WalletUtils.loadCredentials(
+                        "<password>",
+                        "/path/to/<walletfile>");*/
+        //要連接 ganache 就沒有 wallet，直接給 privateKey
+    //    Credentials credentials = Credentials.create("0x3a2b91d1cc8da46bfbf03f8b92aebbbbac452243195e0c4511bd48dd3a8c0648");
+    //    log.info("Credentials loaded");
+        return "123";
     }
 }

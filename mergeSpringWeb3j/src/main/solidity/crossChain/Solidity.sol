@@ -8,60 +8,171 @@ contract AssetList{
         Contract_Owner = msg.sender;
     }
     
-    struct Asset{
+    struct Health{
         address owner;
         uint age;
-        uint Timestamp;
     }
+    Health[] Health_List;
     
-    Asset[] _Asset;
+    struct Car{
+        address owner;
+        uint license;
+    }
+    Car[] Car_List;
     
+    struct USdollar{
+        address owner;
+        uint amount;
+    }
+    USdollar[] USdollar_List;
+    
+    struct Land{
+        address owner;
+        uint value;
+        uint status;
+    }
+    Land[] Land_List;
+    
+    // event addHealth_event(uint index, uint asset);
+    // event addCar_event(uint index, uint asset);
+    // event addUSdollar_event(uint index, uint asset);
+    // event addLand_event(uint index, uint asset);
     // 新增資產
-    // * dst address from Corda
-    function addAsset(address owner, uint age) public{
-        if(owner != msg.sender && Contract_Owner != msg.sender) return;
+    function addAsset_Health(address owner, uint age) public {
+        // if(Contract_Owner != msg.sender) return;
         
-        Asset memory a = Asset(owner, age, now);
-        _Asset.push(a);
+        Health memory a = Health(owner, age);
+        Health_List.push(a);
+        
+        // emit addHealth_event(Health_List.length, age);
+    }
+    function addAsset_Car(address owner, uint license) public {
+        // if(Contract_Owner != msg.sender) return;
+        
+        Car memory a = Car(owner, license);
+        Car_List.push(a);
+        
+        // emit addCar_event(Car_List.length, license);
+    }
+    function addAsset_USdollar(address owner, uint amount) public {
+        // if(Contract_Owner != msg.sender) return;
+        
+        USdollar memory a = USdollar(owner, amount);
+        USdollar_List.push(a);
+        
+        // emit addUSdollar_event(USdollar_List.length, amount);
+    }
+    function addAsset_Land(address owner, uint value) public {
+        // if(Contract_Owner != msg.sender) return;
+        
+        Land memory a = Land(owner, value, 0);
+        Land_List.push(a);
+        
+        // emit addLand_event(Land_List.length, value);
     }
     
     // 取得資產資訊
-    function getAsset(uint i) view public returns(address, uint, uint){
-        return(_Asset[i].owner, _Asset[i].age, _Asset[i].Timestamp);
+    function getAssetInfo_Health(uint i) view public returns (address, uint){
+        return(Health_List[i].owner, Health_List[i].age);
+    }
+    function getAssetInfo_Car(uint i) view public returns (address, uint){
+        return(Car_List[i].owner, Car_List[i].license);
+    }
+    function getAssetInfo_USdollar(uint i) view public returns (address, uint){
+        return(USdollar_List[i].owner, USdollar_List[i].amount);
+    }
+    function getAssetInfo_Land(uint i) view public returns (address, uint){
+        return(Land_List[i].owner, Land_List[i].value);
     }
     
     // 驗證資產擁有人
-    function AccountValidation(address owner, uint i) view public returns(bool){
-        return(_Asset.length >= i && _Asset[i].owner == owner);
+    function HealthValidation(address owner, uint i) view public returns (bool){
+        return(Health_List.length >= i && Health_List[i].owner == owner);
     }
-    
-    // 取得總資產數量
-    function NumberOfList() view public returns(uint){
-        return(_Asset.length);
+    function CarValidation(address owner, uint i) view public returns (bool){
+        return(Car_List.length >= i && Car_List[i].owner == owner);
     }
-    
-    // 取得該資產之擁有人
-    function OwnerOfAsset(uint i) view public returns(address){
-        Asset memory a = _Asset[i];
-        return(a.owner);
+    function USdollarValidation(address owner, uint i) view public returns (bool){
+        return(USdollar_List.length >= i && USdollar_List[i].owner == owner);
+    }
+    function LandValidation(address owner, uint i) view public returns (bool){
+        return(Land_List.length >= i && Land_List[i].owner == owner && Land_List[i].status == 0);
     }
     
     // 變更資產之擁有人
-    function ChangeOwnerOfAsset(uint i, address newOwner) public{
-        if(Contract_Owner == msg.sender){
-            _Asset[i].owner = newOwner;
-        }
+    function ChangeOwnerOfCar(uint i, address newOwner) public {
+        // if(Contract_Owner == msg.sender){
+        //     Car_List[i].owner = newOwner;
+        // }
+        Car_List[i].owner = newOwner;
+    }
+    function ChangeOwnerOfUSdollar(uint i, address newOwner) public {
+        // if(Contract_Owner == msg.sender){
+        //     USdollar_List[i].owner = newOwner;
+        // }
+        USdollar_List[i].owner = newOwner;
+    }
+    function ChangeOwnerOfLand(uint i, address newOwner) public {
+        // if(Contract_Owner == msg.sender){
+        //     Land_List[i].owner = newOwner;
+        // }
+        Land_List[i].owner = newOwner;
+    }
+    
+    function ChangeStatusOfLand(uint i, uint status) public {
+        Land_List[i].status = status;
+    }
+    
+    function ChangeValueOfLand(uint i, uint value) public {
+        // if(Contract_Owner == msg.sender){
+        //     Land_List[i].value = value;
+        // }
+        Land_List[i].value = value;
     }
     
     // 資產查找
-    function QueryAsset(address owner) view public returns(uint[] memory){
-        uint[] memory queryList = new uint[](_Asset.length);   
-        for(uint i = 0; i < _Asset.length; i++){
-            if(_Asset[i].owner == owner){
-                queryList[i] = _Asset[i].age;
-            }
+    function queryHealthAsset() view public returns(uint, address[] memory, uint[] memory){
+        address[] memory addressList = new address[](Health_List.length);
+        uint[] memory ageList = new uint[](Health_List.length);
+        for(uint i = 0; i < Health_List.length; i++){
+            addressList[i] = Health_List[i].owner;
+            ageList[i] = Health_List[i].age;
         }
-        return(queryList);
+        return(Health_List.length, addressList, ageList);
+    }
+    function queryCarAsset() view public returns(uint, address[] memory, uint[] memory){
+        address[] memory addressList = new address[](Car_List.length);
+        uint[] memory licenseList = new uint[](Car_List.length);
+        for(uint i = 0; i < Car_List.length; i++){
+            addressList[i] = Car_List[i].owner;
+            licenseList[i] = Car_List[i].license;
+        }
+        return(Car_List.length, addressList, licenseList);
+    }
+    function queryUSdollarAsset() view public returns(uint, address[] memory, uint[] memory){
+        address[] memory addressList = new address[](USdollar_List.length);
+        uint[] memory amountList = new uint[](USdollar_List.length);
+        for(uint i = 0; i < USdollar_List.length; i++){
+            addressList[i] = USdollar_List[i].owner;
+            amountList[i] = USdollar_List[i].amount;
+        }
+        return(USdollar_List.length, addressList, amountList);
+    }
+    function queryLandAsset() view public returns(uint, address[] memory, uint[] memory, uint[] memory){
+        address[] memory addressList = new address[](Land_List.length);
+        uint[] memory valueList = new uint[](Land_List.length);
+        uint[] memory statusList = new uint[](Land_List.length);
+        for(uint i = 0; i < Land_List.length; i++){
+            addressList[i] = Land_List[i].owner;
+            valueList[i] = Land_List[i].value;
+            statusList[i] = Land_List[i].status;
+        }
+        return(Land_List.length, addressList, valueList, statusList);
+    }
+    
+    // 消滅轉移後的資產
+    function deleteCarAsset(uint i) public {
+        delete Car_List[i];
     }
 }
 
@@ -73,122 +184,165 @@ contract RequestList{
         Contract_Owner = msg.sender;
     }
     
-    struct Request{
+    struct CopyRequest{
         uint EthAsset_Index;
+        address Sender;
         string Receiver;
-        address AssetOwner;
         uint Status;    // 0:pending, 1:reject, 2:success
-        string TxHash;
-        uint CordaAsset_Index;
     }
+    CopyRequest[] _copy;
     
-    Request[] CopyRequest;
-    Request[] TransferRequest;
-    Request[] ExchangeRequest;
-    
-    struct Encumbrance{
+    struct TransferRequest{
         uint EthAsset_Index;
+        address Sender;
         string Receiver;
-        address AssetOwner;
-        uint Status;    // 0:pending, 1:reject, 2:success
-        uint CordaAsset_Index;
-        uint TimeOut;
+        uint Status;
     }
-    Encumbrance[] EncumbranceRequest;
+    TransferRequest[] _transfer;
+    
+    struct ExchangeRequest{
+        uint EthAsset_Index;
+        string CordaAsset_Index;
+        address SenderETH;
+        string SenderCORDA;
+        address ReceiverETH;
+        string ReceiverCORDA;
+        uint Status;
+    }
+    ExchangeRequest[] _exchange;
+    
+    struct EncumbranceRequest{
+        uint RequestIndex;
+        uint EthAsset_Index;
+        string CordaAsset_Index;
+        address LandOwner;
+        string Bank;
+        uint first;
+        uint second;
+        uint third;
+        uint Status; // 0:normal, 1:collateral, 2:Provisional Attachment
+    }
+    EncumbranceRequest[] _encumbrance;
     
     
-    // Action -> 0:Copy, 1:Transfer, 2:Exchange, 3:Encumbrance
     // 新增請求
-    function addRequest(uint Action, address AssetListAddress, address AssetOwner, string memory AssetReceiver, uint EthAsset_Index, uint CordaAsset_Index) public{
-        // 判斷是否validity
-        AssetList al = AssetList(AssetListAddress); // AssetListAddress: Contract address
+    event copy_event(address Sender, string Receiver, uint AssetIndex);
+    function addCopyRequest(address AssetContractAddress,  address Sender, string memory Receiver, uint Index) public {
+        AssetList al = AssetList(AssetContractAddress); // AssetContractAddress: Contract address
         
-        // 根據請求儲存至相對的struct
-        if(al.AccountValidation(AssetOwner, EthAsset_Index)){
-            if(Action == 0){
-                Request memory a = Request(EthAsset_Index, AssetReceiver, AssetOwner, 0, "0", 0);
-                CopyRequest.push(a);
+        if(al.HealthValidation(Sender, Index)){
+            CopyRequest memory a = CopyRequest(Index, Sender, Receiver, 0);
+            _copy.push(a);
+            
+            emit copy_event(Sender, Receiver, Index);
+        }
+    }
+    event transfer_event(address Sender, string Receiver, uint AssetIndex);
+    function addTransferRequest(address AssetContractAddress, address Sender, string memory Receiver, uint Index) public {
+        AssetList al = AssetList(AssetContractAddress);
+        
+        if(al.CarValidation(Sender, Index)){
+            TransferRequest memory a = TransferRequest(Index, Sender, Receiver, 0);
+            _transfer.push(a);
+            
+            emit transfer_event(Sender, Receiver, Index);
+        }
+    }
+    event exchange_event(address SenderETH, string SenderCORDA, address ReceiverETH, string ReceiverCORDA, uint ETHIndex, string CORDAIndex, uint RequestIndex);
+    function addExchangeRequest(address AssetContractAddress, address SenderETH, string memory SenderCORDA, address ReceiverETH, string memory ReceiverCORDA, uint ETHIndex, string memory CORDAIndex) public {
+        AssetList al = AssetList(AssetContractAddress);
+        
+        if(al.USdollarValidation(SenderETH, ETHIndex)){
+            ExchangeRequest memory a = ExchangeRequest(ETHIndex, CORDAIndex, SenderETH, SenderCORDA, ReceiverETH, ReceiverCORDA, 0);
+            _exchange.push(a);
+            
+            emit exchange_event(SenderETH, SenderCORDA, ReceiverETH, ReceiverCORDA, ETHIndex, CORDAIndex, _exchange.length);
+        }
+    }
+    function addEncumbranceRequest(address AssetContractAddress, address LandOwner, string memory Bank, uint ETHIndex, string memory CORDAIndex) public {
+        bool exist = false;
+        AssetList al = AssetList(AssetContractAddress);
+        
+        if(al.LandValidation(LandOwner, ETHIndex)){
+            for(uint i = 0; i < _encumbrance.length; i++){
+                if(_encumbrance[i].EthAsset_Index == ETHIndex){
+                    exist = true;
+                }
             }
-            else if(Action == 1){
-                Request memory a = Request(EthAsset_Index, AssetReceiver, AssetOwner, 0, "0", 0);
-                TransferRequest.push(a);
-            }
-            else if(Action == 2){
-                Request memory a = Request(EthAsset_Index, AssetReceiver, AssetOwner, 0, "0", CordaAsset_Index);
-                ExchangeRequest.push(a);
+            if(!exist){
+                al.ChangeStatusOfLand(ETHIndex, 1);
+                EncumbranceRequest memory a = EncumbranceRequest(_encumbrance.length, ETHIndex, CORDAIndex, LandOwner, Bank, 50, 100, 120, 1);
+                _encumbrance.push(a);
             }
         }
     }
     
-    function addEncumbranceRequest(address AssetListAddress, address AssetOwner, string memory AssetReceiver, uint EthAsset_Index, uint CordaAsset_Index, uint TimeOut) public{
-        // 判斷是否validity
-        AssetList al = AssetList(AssetListAddress); // AssetListAddress: Contract address
-        if(al.AccountValidation(AssetOwner, EthAsset_Index)){
-            Encumbrance memory a = Encumbrance(EthAsset_Index, AssetReceiver, AssetOwner, 0, CordaAsset_Index, TimeOut);
-            EncumbranceRequest.push(a);
+    // Check timeout of EncumbranceRequest
+    event encumbrance_event(string info, uint LandIndex, string USIndex, uint RequestIndex, string Bank);
+    function checkEncumbranceTimeOut(uint time) public {
+        for(uint i = 0; i < _encumbrance.length; i++){
+            if(_encumbrance[i].Status == 1){
+                if(_encumbrance[i].first <= time && _encumbrance[i].second > time && _encumbrance[i].third > time){
+                    // emit encumbrance_event("Meet the First time!", _encumbrance[i].EthAsset_Index, _encumbrance[i].CordaAsset_Index, _encumbrance[i].RequestIndex);
+                }
+                else if(_encumbrance[i].first <= time && _encumbrance[i].second <= time && _encumbrance[i].third > time){
+                    // emit encumbrance_event("Meet the Second time!", _encumbrance[i].EthAsset_Index, _encumbrance[i].CordaAsset_Index, _encumbrance[i].RequestIndex);
+                }
+                else if(_encumbrance[i].first <= time && _encumbrance[i].second <= time && _encumbrance[i].third <= time){
+                    emit encumbrance_event("Meet the Third time!", _encumbrance[i].EthAsset_Index, _encumbrance[i].CordaAsset_Index, _encumbrance[i].RequestIndex, _encumbrance[i].Bank);
+                }
+            }
         }
     }
     
     // 改變該請求之資產狀態，並放入TxHash
-    function changeStatus(uint Action, uint Index, uint Status, string memory Hash) public{
+    function changeCopyStatus(uint i, uint Status) public {
         if(Contract_Owner == msg.sender){
-            if(Action == 0){
-                CopyRequest[Index].Status = Status;
-                CopyRequest[Index].TxHash = Hash;
-            }
-            else if(Action == 1){
-                TransferRequest[Index].Status = Status;
-                TransferRequest[Index].TxHash = Hash;
-            }
-            else if(Action == 2){
-                ExchangeRequest[Index].Status = Status;
-                ExchangeRequest[Index].TxHash = Hash;
-            }
-            else if(Action == 3){
-                EncumbranceRequest[Index].Status = Status;
-            }
+            _copy[i].Status = Status;
         }
+    }
+    function changeTransferStatus(uint i, uint Status) public {
+        if(Contract_Owner == msg.sender){
+            _transfer[i].Status = Status;
+        }
+    }
+    function changeExchangeStatus(uint i, uint Status) public {
+        if(Contract_Owner == msg.sender){
+            _exchange[i].Status = Status;
+        }
+    }
+    function changeEncumbranceStatus(uint i, uint Status) public {
+        if(Contract_Owner == msg.sender){
+            _encumbrance[i].Status = Status;
+        }
+    }
+}
+
+contract TxValidation{
+    // 此合約的擁有者
+    address private Contract_Owner;
+    
+    constructor() public{
+        Contract_Owner = msg.sender;
     }
     
-    // 取得尚未完成之請求
-    function PendingRequest(uint Action) view public returns(uint, string memory, uint, address, uint){
-        if(Action == 0){
-            for(uint i = 0; i < CopyRequest.length; i++){
-                if(CopyRequest[i].Status == 0){
-                    return(CopyRequest[i].EthAsset_Index, CopyRequest[i].Receiver, i, CopyRequest[i].AssetOwner, CopyRequest[i].CordaAsset_Index);
-                }
-            }
-        }
-        else if(Action == 1){
-            for(uint i = 0; i < TransferRequest.length; i++){
-                if(TransferRequest[i].Status == 0){
-                    return(TransferRequest[i].EthAsset_Index, TransferRequest[i].Receiver, i, TransferRequest[i].AssetOwner, TransferRequest[i].CordaAsset_Index);
-                }
-            }
-        }
-        else if(Action == 2){
-            for(uint i = 0; i < ExchangeRequest.length; i++){
-                if(ExchangeRequest[i].Status == 0){
-                    return(ExchangeRequest[i].EthAsset_Index, ExchangeRequest[i].Receiver, i, ExchangeRequest[i].AssetOwner, ExchangeRequest[i].CordaAsset_Index);
-                }
-            }
-        }
-    }
-    
-    // 牽制之請求
-    function PendingEncumbrance(uint TimeOut) view public returns(uint[] memory, uint[] memory, address[] memory){
-        uint[] memory getEvidence = new uint[](EncumbranceRequest.length);
-        uint[] memory Asset_Index = new uint[](EncumbranceRequest.length);
-        address[] memory AssetOwner = new address[](EncumbranceRequest.length);
-        for(uint i = 0; i < EncumbranceRequest.length; i++){
-            if(EncumbranceRequest[i].Status == 0){
-                if(EncumbranceRequest[i].TimeOut <= TimeOut){
-                    getEvidence[i] = i;
-                    Asset_Index[i] = EncumbranceRequest[i].EthAsset_Index;
-                    AssetOwner[i] = EncumbranceRequest[i].AssetOwner;
-                }
-            }
-        }
-        return(getEvidence, Asset_Index, AssetOwner);
-    }
+   function verify(address AssetContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, address owner, uint asset) public {
+       bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+       bytes32 prefixedValue = keccak256(abi.encodePacked(prefix, testStringBytes));
+       if(ecrecover(prefixedValue, v, r, s) == Notary){
+           AssetList al = AssetList(AssetContractAddress);
+           
+           al.addAsset_Health(owner, asset);
+       }
+   }
+   
+   function stringToBytes32(string memory source) pure public returns (bytes32 result) {
+       bytes memory temp = bytes(source);
+       if(temp.length == 0){
+           return 0x0;
+       }
+       assembly {
+           result := mload(add(source, 32))
+       }
+   }
 }
