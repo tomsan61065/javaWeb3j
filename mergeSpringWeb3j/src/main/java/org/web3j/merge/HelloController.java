@@ -2,11 +2,12 @@ package org.web3j.merge;
 
 //spring boot
 //import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
+//import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
+//import org.springframework.web.bind.annotation.GetMapping;
+//import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 
@@ -71,7 +72,7 @@ public class HelloController {
 
     String NotaryAgent = "0x76ac34807210d52fcbfc0412cf4da5c672214752";
 
-/*
+/*  //web3j 建構 smartcontract 的 instance:
     YourSmartContract contract = YourSmartContract.load(
         "0x<address>|<ensName>", <web3j>, <credentials>, GAS_PRICE, GAS_LIMIT);
 
@@ -166,6 +167,7 @@ public class HelloController {
     }
 
     @RequestMapping("/copy")
+    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
     public String copy() throws Exception{
         // FIXME: Generate a new wallet file using the web3j command line tools https://docs.web3j.io/command_line.html
      /*   Credentials credentials =
