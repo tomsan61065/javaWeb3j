@@ -1,5 +1,9 @@
 package org.web3j.merge;
 
+import java.util.*;
+import java.math.BigInteger;
+import java.math.BigDecimal;
+
 //spring boot
 //import org.springframework.web.bind.annotation.RestController;
 //import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,8 +13,6 @@ import org.springframework.web.bind.annotation.*;
 //import org.springframework.web.bind.annotation.GetMapping;
 //import org.springframework.web.bind.annotation.RequestParam;
 
-import java.math.BigDecimal;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,20 +21,22 @@ import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
-import org.web3j.merge.contracts.generated.Greeter;
 import org.web3j.tx.Transfer;
 import org.web3j.tx.gas.ContractGasProvider;
 import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.tx.ClientTransactionManager;
+import org.web3j.tx.TransactionManager;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
+import org.web3j.protocol.admin.*;
+import org.web3j.protocol.admin.methods.response.PersonalUnlockAccount;
 
-import org.web3j.merge.contracts.generated.RequestList;
-import org.web3j.merge.contracts.generated.AssetList;
 
 import org.web3j.merge.MemberAccount; //引入自定義結構 MemberAccount
 import org.springframework.beans.factory.annotation.Autowired; //使用 @Autowired
 
 //引入 contract instance (abi?)
+import org.web3j.merge.contracts.generated.Greeter;
 import org.web3j.merge.contracts.generated.AssetList;
 import org.web3j.merge.contracts.generated.RequestList;
 import org.web3j.merge.contracts.generated.TxValidation;
@@ -68,6 +72,11 @@ public class HelloController {
     String ethereumUri = "http://140.119.101.130:7575";
 
     private Web3j web3j = Web3j.build(new HttpService());  // for local host
+    Admin web3jAdmin = Admin.build(new HttpService()); //https://docs.web3j.io/management_apis.html
+    //load contract without credantials
+    //https://github.com/web3j/web3j/blob/master/core/src/main/java/org/web3j/ens/EnsResolver.java 
+    private final TransactionManager transactionManager = new ClientTransactionManager(web3j, null);  // don't use empty string
+
     private static final Logger log = LoggerFactory.getLogger(Application.class);
 
     String NotaryAgent = "0x76ac34807210d52fcbfc0412cf4da5c672214752";
@@ -76,12 +85,23 @@ public class HelloController {
     YourSmartContract contract = YourSmartContract.load(
         "0x<address>|<ensName>", <web3j>, <credentials>, GAS_PRICE, GAS_LIMIT);
 
-    let AssetList_ABI = require("../../Contract/AssetList_ABI.js");
-    let AssetList_Address = "0x0bfd6d60bdadbbd3dfed87afbe505761708973c4";
-    let AssetList = new web3.eth.Contract(AssetList_ABI, AssetList_Address);
+    //不用 credentials 的建構方式
+    ENS ensRegistry = ENS.load(
+        registryContract, web3j, transactionManager,
+        DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+    */
 
     String AssetList_Address = "0x0bfd6d60bdadbbd3dfed87afbe505761708973c4";
-    AssetList assetListContract = AssetList.load(AssetList_Address, web3j, credentials, GAS_PRICE, GAS_LIMIT);*/
+    AssetList AssetListContract = AssetList.load(
+        AssetList_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+
+    String RequestList_Address = "0x8e4d2082152a624ef441a3d425d62fba1711fe1d";
+    RequestList RequestListContract = RequestList.load(
+        RequestList_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+        
+    String Validation_Address = "0x89bce2f68f18f087728917b9db91b69c89633968";
+    TxValidation ValidationContract = TxValidation.load(
+        Validation_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
 
     public static final String AliceETH = "0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2";
     public static final String BobETH = "0xbe36543da0bc51f31cd3f915088d5d704572d047";
@@ -166,9 +186,53 @@ public class HelloController {
         return MA;
     }
 
-    @RequestMapping("/copy")
+    public static class Copy{ 
+        //要 static inner class
+        // https://stackoverflow.com/questions/45586802/json-parse-error-can-not-construct-instance-of-class
+        public String object;
+        public int score;
+        public String Eth;
+        public String Corda;
+        //public Copy(){}
+        /*public Copy(String object, int score){
+            this.object = object;
+            this.score = score;
+        }*/
+    }
+
+    public class CopyRequestTx{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
+        public String blockHash;
+        public String blockNumber;
+        public String from;
+        public String gas; 
+        public String gasPrice; 
+        public String hash; 
+        public String input;
+        public String nonce; 
+        public String to; 
+        public String tansactionIndex;  
+        public String value; 
+        public String v; 
+        public String r; 
+        public String s;
+        public String Sender = "0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2";
+        public String Receiver = "BobCORDA";
+        public String AssetTx = hash;
+        
+        /*public CopyRequestTx(String object, int score){
+            this.object = object;
+            this.score = score;
+        }*/
+
+    }
+
+    //將 request 存到 eth smartcontract
+    @PostMapping("/copy")
     @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
-    public String copy() throws Exception{
+    public String copy(@RequestBody Copy _copy) throws Exception{
+        //@RequestParam 是給 url 放參數用
+        
+        
         // FIXME: Generate a new wallet file using the web3j command line tools https://docs.web3j.io/command_line.html
      /*   Credentials credentials =
                 WalletUtils.loadCredentials(
@@ -177,6 +241,30 @@ public class HelloController {
         //要連接 ganache 就沒有 wallet，直接給 privateKey
     //    Credentials credentials = Credentials.create("0x3a2b91d1cc8da46bfbf03f8b92aebbbbac452243195e0c4511bd48dd3a8c0648");
     //    log.info("Credentials loaded");
-        return "123";
+        log.info(_copy.object);
+        log.info(_copy.Eth + " " + _copy.Corda);
+        if(_copy.Eth == null && _copy.Corda == null){
+            log.info("Eth&Corda null");
+            List<CopyRequestTx> CopyRequestTxs = new ArrayList<>();
+            String hash = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigDecimal.valueOf(500) ).send();
+            if (personalUnlockAccount.accountUnlocked()) {
+                // send a transaction
+                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address,"0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2", "Alice", BigDecimal.valueOf(0) ).send();
+                log.info("--------------- " + '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2' + " send a copy request ---------------");
+                log.info(transactionReceipt);
+
+            }
+        }
+        //return "Done.html";
+        return _copy.object + _copy.score;
+    }
+
+    @PostMapping("/copy2")
+    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    public String copy(@RequestBody String object, @RequestBody int score) throws Exception{
+        //@RequestParam 是給 url 放參數用
+
+        return object + score;
     }
 }
