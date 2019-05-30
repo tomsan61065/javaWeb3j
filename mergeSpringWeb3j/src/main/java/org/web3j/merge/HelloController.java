@@ -228,7 +228,7 @@ public class HelloController {
 
     //將 request 存到 eth smartcontract
     @PostMapping("/copy")
-    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    //@ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
     public String copy(@RequestBody Copy _copy) throws Exception{
         //@RequestParam 是給 url 放參數用
         
@@ -245,20 +245,24 @@ public class HelloController {
         log.info(_copy.Eth + " " + _copy.Corda);
         if(_copy.Eth == null && _copy.Corda == null){
             log.info("Eth&Corda null");
-            List<CopyRequestTx> CopyRequestTxs = new ArrayList<>();
-            String hash = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
+            String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigDecimal.valueOf(500) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
-                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address,"0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2", "Alice", BigDecimal.valueOf(0) ).send();
-                log.info("--------------- " + '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2' + " send a copy request ---------------");
-                log.info(transactionReceipt);
+                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigDecimal.valueOf(0) ).send();
+                log.info("[user] AliceETH send a copy request"); // Dev 幹嘛多一個 + 串聯
 
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx, receipt.transactionHash).send(); // Dev 沒有合約
+                log.info("[user] send 2 Transactions receipt for Copy");
+                
+                return "Done.html";
             }
         }
         //return "Done.html";
         return _copy.object + _copy.score;
     }
+
+    RequestListContract.
 
     @PostMapping("/copy2")
     @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
