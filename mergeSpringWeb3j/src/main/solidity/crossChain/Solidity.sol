@@ -17,6 +17,7 @@ contract AssetList{
     struct Car{
         address owner;
         uint license;
+        bool freeze;
     }
     Car[] Car_List;
     
@@ -33,42 +34,30 @@ contract AssetList{
     }
     Land[] Land_List;
     
-    // event addHealth_event(uint index, uint asset);
-    // event addCar_event(uint index, uint asset);
-    // event addUSdollar_event(uint index, uint asset);
-    // event addLand_event(uint index, uint asset);
     // 新增資產
     function addAsset_Health(address owner, uint age) public {
         // if(Contract_Owner != msg.sender) return;
         
         Health memory a = Health(owner, age);
         Health_List.push(a);
-        
-        // emit addHealth_event(Health_List.length, age);
     }
     function addAsset_Car(address owner, uint license) public {
         // if(Contract_Owner != msg.sender) return;
         
-        Car memory a = Car(owner, license);
+        Car memory a = Car(owner, license, false);
         Car_List.push(a);
-        
-        // emit addCar_event(Car_List.length, license);
     }
     function addAsset_USdollar(address owner, uint amount) public {
         // if(Contract_Owner != msg.sender) return;
         
         USdollar memory a = USdollar(owner, amount);
         USdollar_List.push(a);
-        
-        // emit addUSdollar_event(USdollar_List.length, amount);
     }
     function addAsset_Land(address owner, uint value) public {
         // if(Contract_Owner != msg.sender) return;
         
         Land memory a = Land(owner, value, 0);
         Land_List.push(a);
-        
-        // emit addLand_event(Land_List.length, value);
     }
     
     // 取得資產資訊
@@ -90,7 +79,7 @@ contract AssetList{
         return(Health_List.length >= i && Health_List[i].owner == owner);
     }
     function CarValidation(address owner, uint i) view public returns (bool){
-        return(Car_List.length >= i && Car_List[i].owner == owner);
+        return(Car_List.length >= i && Car_List[i].owner == owner && !Car_List[i].freeze && Car_List[i].license != 0);
     }
     function USdollarValidation(address owner, uint i) view public returns (bool){
         return(USdollar_List.length >= i && USdollar_List[i].owner == owner);
@@ -100,11 +89,8 @@ contract AssetList{
     }
     
     // 變更資產之擁有人
-    function ChangeOwnerOfCar(uint i, address newOwner) public {
-        // if(Contract_Owner == msg.sender){
-        //     Car_List[i].owner = newOwner;
-        // }
-        Car_List[i].owner = newOwner;
+    function ChangeStatusOfCar(uint i, bool freeze) public {
+        Car_List[i].freeze = freeze;
     }
     function ChangeOwnerOfUSdollar(uint i, address newOwner) public {
         // if(Contract_Owner == msg.sender){
@@ -174,6 +160,19 @@ contract AssetList{
     function deleteCarAsset(uint i) public {
         delete Car_List[i];
     }
+    // 解凍轉移失敗的資產
+    function unfreezeCarAsset(uint i) public {
+        Car_List[i].freeze = false;
+    }
+    
+    // For time oracle
+    function checkPendingRequest() public {
+        for(uint i = 0; i < Car_List.length; i++){
+            if(Car_List[i].freeze){
+                Car_List[i].freeze = false;
+            }
+        }
+    }
 }
 
 contract RequestList{
@@ -226,39 +225,47 @@ contract RequestList{
     
     
     // 新增請求
-    event copy_event(address Sender, string Receiver, uint AssetIndex);
+    event copy_event(bytes32 assetTx, bytes32 requestTx);
     function addCopyRequest(address AssetContractAddress,  address Sender, string memory Receiver, uint Index) public {
         AssetList al = AssetList(AssetContractAddress); // AssetContractAddress: Contract address
         
         if(al.HealthValidation(Sender, Index)){
             CopyRequest memory a = CopyRequest(Index, Sender, Receiver, 0);
             _copy.push(a);
-            
-            emit copy_event(Sender, Receiver, Index);
         }
     }
-    event transfer_event(address Sender, string Receiver, uint AssetIndex);
+    function emitCopyEvent(bytes32 assetTx, bytes32 requestTx) public {
+        emit copy_event(assetTx, requestTx);
+    }
+    
+    event transfer_event(bytes32 assetTx, bytes32 requestTx);
     function addTransferRequest(address AssetContractAddress, address Sender, string memory Receiver, uint Index) public {
         AssetList al = AssetList(AssetContractAddress);
         
         if(al.CarValidation(Sender, Index)){
+            al.ChangeStatusOfCar(Index, true);
+            
             TransferRequest memory a = TransferRequest(Index, Sender, Receiver, 0);
             _transfer.push(a);
-            
-            emit transfer_event(Sender, Receiver, Index);
         }
     }
-    event exchange_event(address SenderETH, string SenderCORDA, address ReceiverETH, string ReceiverCORDA, uint ETHIndex, string CORDAIndex, uint RequestIndex);
+    function emitTransferEvent(bytes32 assetTx, bytes32 requestTx) public {
+        emit transfer_event(assetTx, requestTx);
+    }
+    
+    event exchange_event(bytes32 assetTx, bytes32 requestTx);
     function addExchangeRequest(address AssetContractAddress, address SenderETH, string memory SenderCORDA, address ReceiverETH, string memory ReceiverCORDA, uint ETHIndex, string memory CORDAIndex) public {
         AssetList al = AssetList(AssetContractAddress);
         
         if(al.USdollarValidation(SenderETH, ETHIndex)){
             ExchangeRequest memory a = ExchangeRequest(ETHIndex, CORDAIndex, SenderETH, SenderCORDA, ReceiverETH, ReceiverCORDA, 0);
             _exchange.push(a);
-            
-            emit exchange_event(SenderETH, SenderCORDA, ReceiverETH, ReceiverCORDA, ETHIndex, CORDAIndex, _exchange.length);
         }
     }
+    function emitExchangeEvent(bytes32 assetTx, bytes32 requestTx) public {
+        emit exchange_event(assetTx, requestTx);
+    }
+    
     function addEncumbranceRequest(address AssetContractAddress, address LandOwner, string memory Bank, uint ETHIndex, string memory CORDAIndex) public {
         bool exist = false;
         AssetList al = AssetList(AssetContractAddress);
@@ -326,14 +333,44 @@ contract TxValidation{
         Contract_Owner = msg.sender;
     }
     
-   function verify(address AssetContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, address owner, uint asset) public {
+   function verify(address AssetContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, address owner, uint asset, uint action, string memory CordaIndex) public {
+       bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+       bytes32 prefixedValue = keccak256(abi.encodePacked(prefix, testStringBytes));
+       if(ecrecover(prefixedValue, v, r, s) == Notary){
+           if(action == 0){
+               AssetList al = AssetList(AssetContractAddress);
+               al.addAsset_Health(owner, asset);
+           }
+           else if(action == 1){
+               AssetList al = AssetList(AssetContractAddress);
+               al.addAsset_Car(owner, asset); 
+           }
+       }
+       else{
+           revert('Request Fail!');
+       }
+   }
+   
+   function verifyResponse(address AssetContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, uint EthIndex, uint action, bool status) public {
        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
        bytes32 prefixedValue = keccak256(abi.encodePacked(prefix, testStringBytes));
        if(ecrecover(prefixedValue, v, r, s) == Notary){
            AssetList al = AssetList(AssetContractAddress);
-           
-           al.addAsset_Health(owner, asset);
+           if(action == 1){
+               if(status){
+                   al.deleteCarAsset(EthIndex);
+               }
+               else{
+                   al.unfreezeCarAsset(EthIndex);
+               }
+           }
        }
+   }
+   
+   function verify2(bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s) pure public returns(address) {
+       bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+       bytes32 prefixedValue = keccak256(abi.encodePacked(prefix, testStringBytes));
+       return ecrecover(prefixedValue, v, r, s);
    }
    
    function stringToBytes32(string memory source) pure public returns (bytes32 result) {
@@ -344,5 +381,10 @@ contract TxValidation{
        assembly {
            result := mload(add(source, 32))
        }
+   }
+   
+   event validation_event(bytes32 validationTx, uint Action);
+   function emitValidationEvent(bytes32 validationTx, uint Action) public {
+       emit validation_event(validationTx, Action);
    }
 }

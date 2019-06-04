@@ -48,7 +48,7 @@ public class Application {
     private static final Logger log = LoggerFactory.getLogger(Application.class);
 
     public static void main(String[] args) throws Exception {
-        new Application().run();
+        new Application().run(); //由這邊觸發 web3j 的程式碼
     }
 
     private void run() throws Exception {

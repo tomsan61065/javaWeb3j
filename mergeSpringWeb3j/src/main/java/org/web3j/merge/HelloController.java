@@ -69,10 +69,19 @@ import org.web3j.merge.contracts.generated.TxValidation;
 //https://github.com/web3j/web3j
 @Controller //MVC
 public class HelloController {
-    String ethereumUri = "http://140.119.101.130:7575";
+    String ethereumUri = "ws://140.119.101.130:7576";
 
-    private Web3j web3j = Web3j.build(new HttpService());  // for local host
-    Admin web3jAdmin = Admin.build(new HttpService()); //https://docs.web3j.io/management_apis.html
+    // websocket 寫法
+    //https://web3j.readthedocs.io/en/latest/getting_started.html#publish-subscribe-pub-sub
+    final WebSocketClient webSocketClient = new WebSocketClient(new URI(ethereumUri));
+    final boolean includeRawResponses = false;
+    final WebSocketService webSocketService = new WebSocketService(webSocketClient, includeRawResponses);
+    
+    // private Web3j web3j = Web3j.build(new HttpService());  // for local host
+    // Admin web3jAdmin = Admin.build(new HttpService()); //https://docs.web3j.io/management_apis.html
+    final Web3j web3j = Web3j.build(webSocketService);
+    final Admin web3jAdmin = Admin.build(webSocketService);
+
     //load contract without credantials
     //https://github.com/web3j/web3j/blob/master/core/src/main/java/org/web3j/ens/EnsResolver.java 
     private final TransactionManager transactionManager = new ClientTransactionManager(web3j, null);  // don't use empty string
@@ -91,22 +100,29 @@ public class HelloController {
         DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
     */
 
-    String AssetList_Address = "0x0bfd6d60bdadbbd3dfed87afbe505761708973c4";
+    String AssetList_Address = "0xa53b0304ed2ac49e4bf83f28da15c62328476d85";
     AssetList AssetListContract = AssetList.load(
         AssetList_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
 
-    String RequestList_Address = "0x8e4d2082152a624ef441a3d425d62fba1711fe1d";
+    String RequestList_Address = "0xcc1a47bf74df0752f8647baf3e6d1ecc3ff080ba";
     RequestList RequestListContract = RequestList.load(
         RequestList_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
         
-    String Validation_Address = "0x89bce2f68f18f087728917b9db91b69c89633968";
+    String Validation_Address = "0x8b61b25cbe9cb200e325db75a067d797a586b03d";
     TxValidation ValidationContract = TxValidation.load(
         Validation_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
 
     public static final String AliceETH = "0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2";
     public static final String BobETH = "0xbe36543da0bc51f31cd3f915088d5d704572d047";
+    /* <--------------------------------------------------------------------------------------------------> */
+    /* <---------------------------------------Validation Setting-----------------------------------------> */
+    /* <--------------------------------------------------------------------------------------------------> */
+    public static final String notary = "0xe6a31739cdda7a55ab7a1a62b719279c7c144df6";
+    public static final String msgHash = "0xafecccaa184461341805019494d1d706dbdc4a89";
 
-
+    /* <--------------------------------------------------------------------------------------------------> */
+    /* <--------------------------------------Ethereum WebSite--------------------------------------------> */
+    /* <--------------------------------------------------------------------------------------------------> */
     @RequestMapping("/")
     public String index() throws Exception{
 
@@ -226,6 +242,7 @@ public class HelloController {
 
     }
 
+    String healthTx = "";
     //將 request 存到 eth smartcontract
     @PostMapping("/copy")
     //@ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
@@ -246,13 +263,13 @@ public class HelloController {
         if(_copy.Eth == null && _copy.Corda == null){
             log.info("Eth&Corda null");
             String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
-            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigDecimal.valueOf(500) ).send();
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
-                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigDecimal.valueOf(0) ).send();
+                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigInteger.valueOf(0) ).send();
                 log.info("[user] AliceETH send a copy request"); // Dev 幹嘛多一個 + 串聯
 
-                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx, receipt.transactionHash).send(); // Dev 沒有合約
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx, transactionReceipt.getTransactionHash()).send();
                 log.info("[user] send 2 Transactions receipt for Copy");
                 
                 return "Done.html";
@@ -262,7 +279,27 @@ public class HelloController {
         return _copy.object + _copy.score;
     }
 
-    RequestListContract.
+    //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
+    //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
+    //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
+    //別人範例 https://blog.csdn.net/liuzhijun301/article/details/80240437
+    //範例與問題 https://ethereum.stackexchange.com/questions/51958/subscribing-to-event-using-web3j
+    EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+    // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
+    String encodedEventSignature = EventEncoder.encode(RequestListContract.MYEVENT_EVENT);
+    filter.addSingleTopic(encodedEventSignature);
+    log.info("subscribing to event with filter");
+    web3.ethLogObservable(filter).subscribe(eventString -> log.info("event string= ", eventString.toString()));
+    Web3j.ethLogFlowable(filter).subscribe(new Action1<Log>() {
+        @Override    
+        public void call(Log log) {
+            System.out.println("log.toString(): " +  log.toString());
+        }
+    });
+
+    //合約wrapper 的功能，研究中
+    //RequestListContract.copy_eventEventFlowable(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST);
+
 
     @PostMapping("/copy2")
     @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
