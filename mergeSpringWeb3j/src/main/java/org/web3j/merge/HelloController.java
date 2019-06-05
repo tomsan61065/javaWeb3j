@@ -3,6 +3,8 @@ package org.web3j.merge;
 import java.util.*;
 import java.math.BigInteger;
 import java.math.BigDecimal;
+import java.net.*;
+import java.io.*;
 
 //spring boot
 //import org.springframework.web.bind.annotation.RestController;
@@ -18,9 +20,6 @@ import org.slf4j.LoggerFactory;
 
 //web3j
 import org.web3j.crypto.Credentials;
-import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.Transfer;
 import org.web3j.tx.gas.ContractGasProvider;
 import org.web3j.tx.gas.DefaultGasProvider;
@@ -28,8 +27,33 @@ import org.web3j.tx.ClientTransactionManager;
 import org.web3j.tx.TransactionManager;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.EventEncoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Event;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.Web3jService;
+import org.web3j.protocol.http.HttpService;
+import org.web3j.protocol.websocket.*;
+import org.web3j.protocol.websocket.WebSocketClient;
+import org.web3j.protocol.websocket.WebSocketListener;
+import org.web3j.protocol.websocket.WebSocketService;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
+import org.web3j.protocol.http.HttpService;
 import org.web3j.protocol.admin.*;
 import org.web3j.protocol.admin.methods.response.PersonalUnlockAccount;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.request.EthFilter;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthEstimateGas;
+import org.web3j.protocol.core.methods.response.EthLog;
+import org.web3j.protocol.core.methods.response.Log;
+
 
 
 import org.web3j.merge.MemberAccount; //引入自定義結構 MemberAccount
@@ -69,16 +93,28 @@ import org.web3j.merge.contracts.generated.TxValidation;
 //https://github.com/web3j/web3j
 @Controller //MVC
 public class HelloController {
-    String ethereumUri = "ws://140.119.101.130:7576";
+
+    private static URI parseURI(String serverUrl){
+        try{
+            return new URI(serverUrl);
+        }catch(URISyntaxException e){
+            //handle exception
+            return null;
+        }
+    }
+
+    //String ethereumUri = "ws://140.119.101.130:7576";
+    String ethereumUri = "ws://127.0.0.1:8545";
 
     // websocket 寫法
     //https://web3j.readthedocs.io/en/latest/getting_started.html#publish-subscribe-pub-sub
-    final WebSocketClient webSocketClient = new WebSocketClient(new URI(ethereumUri));
+    //final WebSocketClient webSocketClient = new WebSocketClient(new URI(ethereumUri));
+    final WebSocketClient webSocketClient = new WebSocketClient(parseURI(ethereumUri));
     final boolean includeRawResponses = false;
     final WebSocketService webSocketService = new WebSocketService(webSocketClient, includeRawResponses);
-    
-    // private Web3j web3j = Web3j.build(new HttpService());  // for local host
-    // Admin web3jAdmin = Admin.build(new HttpService()); //https://docs.web3j.io/management_apis.html
+
+    //private Web3j web3j = Web3j.build(new HttpService());  // for local host
+    //Admin web3jAdmin = Admin.build(new HttpService()); //https://docs.web3j.io/management_apis.html
     final Web3j web3j = Web3j.build(webSocketService);
     final Admin web3jAdmin = Admin.build(webSocketService);
 
@@ -125,7 +161,7 @@ public class HelloController {
     /* <--------------------------------------------------------------------------------------------------> */
     @RequestMapping("/")
     public String index() throws Exception{
-
+        listenEvent();
         /*
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
@@ -242,6 +278,43 @@ public class HelloController {
 
     }
 
+    String ganacheAddress = "0xaefd426e44f7a3fcfc873a99492775506705eed9";
+    @RequestMapping("/deploy")
+    @ResponseBody
+    public String deployContract() throws Exception{
+        webSocketService.connect();
+        TransactionManager transactionManager2 = new ClientTransactionManager(web3j, ganacheAddress);//transaction manager
+
+        //要用 unlock 的方式作法 https://web3j.readthedocs.io/en/latest/transactions.html#transaction-signing-via-an-ethereum-client
+        //官方 example https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/DeployContractIT.java
+        PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(ganacheAddress, "1234", BigInteger.valueOf(500) ).send();
+            if (personalUnlockAccount.accountUnlocked()) {
+                // send a transaction
+
+                ContractGasProvider contractGasProvider = new DefaultGasProvider();
+                Greeter contract = Greeter.deploy(
+                        web3jAdmin,
+                        transactionManager2,
+                        contractGasProvider,
+                        "test"
+                ).send();
+        
+                String contractAddress = contract.getContractAddress();
+                log.info("Smart contract deployed to address " + contractAddress);
+                //   log.info("View contract at https://rinkeby.etherscan.io/address/" + contractAddress);
+        
+                log.info("Value stored in remote smart contract: " + contract.greet().send());
+        
+                // Lets modify the value in our smart contract
+                TransactionReceipt transactionReceipt = contract.newGreeting("Well hello again").send();
+        
+                log.info("New value stored in remote smart contract: " + contract.greet().send());
+                
+            }
+        return "true";
+    }
+
+
     String healthTx = "";
     //將 request 存到 eth smartcontract
     @PostMapping("/copy")
@@ -269,7 +342,7 @@ public class HelloController {
                 TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigInteger.valueOf(0) ).send();
                 log.info("[user] AliceETH send a copy request"); // Dev 幹嘛多一個 + 串聯
 
-                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx, transactionReceipt.getTransactionHash()).send();
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx.getBytes(), transactionReceipt.getTransactionHash().getBytes() ).send();
                 log.info("[user] send 2 Transactions receipt for Copy");
                 
                 return "Done.html";
@@ -279,24 +352,21 @@ public class HelloController {
         return _copy.object + _copy.score;
     }
 
+    void listenEvent(){
     //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
     //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
     //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
     //別人範例 https://blog.csdn.net/liuzhijun301/article/details/80240437
     //範例與問題 https://ethereum.stackexchange.com/questions/51958/subscribing-to-event-using-web3j
-    EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
-    // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
-    String encodedEventSignature = EventEncoder.encode(RequestListContract.MYEVENT_EVENT);
-    filter.addSingleTopic(encodedEventSignature);
-    log.info("subscribing to event with filter");
-    web3.ethLogObservable(filter).subscribe(eventString -> log.info("event string= ", eventString.toString()));
-    Web3j.ethLogFlowable(filter).subscribe(new Action1<Log>() {
-        @Override    
-        public void call(Log log) {
-            System.out.println("log.toString(): " +  log.toString());
-        }
-    });
-
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+        // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
+        String encodedEventSignature = EventEncoder.encode(RequestListContract.COPY_EVENT_EVENT);
+        filter.addSingleTopic(encodedEventSignature);
+        log.info("subscribing to event with filter");
+        web3j.ethLogFlowable(filter).subscribe(eventString -> {
+            log.info("event string= ", eventString.toString());
+        });
+    }
     //合約wrapper 的功能，研究中
     //RequestListContract.copy_eventEventFlowable(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST);
 
