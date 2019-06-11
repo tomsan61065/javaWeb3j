@@ -278,42 +278,107 @@ public class HelloController {
 
     }
 
-    String ganacheAddress = "0xaefd426e44f7a3fcfc873a99492775506705eed9";
+    String ganacheAddress = "0x0e07d6c906341eab3558ba9d3db251e7826b0b3c"; //每次重開 ganache 都要改成上面存在的 address
     @RequestMapping("/deploy")
     @ResponseBody
     public String deployContract() throws Exception{
-        webSocketService.connect();
+        webSocketService.connect(); //這樣才會連接上 enode
+        TransactionManager transactionManager2 = new ClientTransactionManager(web3j, ganacheAddress);//transaction manager
+        testListenEvent();
+
+        //要用 unlock 的方式作法 https://web3j.readthedocs.io/en/latest/transactions.html#transaction-signing-via-an-ethereum-client
+        //官方 example https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/DeployContractIT.java
+        PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(ganacheAddress, "1234", BigInteger.valueOf(500) ).send();
+        if (personalUnlockAccount.accountUnlocked()) {
+            // send a transaction
+
+            ContractGasProvider contractGasProvider = new DefaultGasProvider();
+            Greeter contract = Greeter.deploy(
+                web3jAdmin,
+                transactionManager2,
+                contractGasProvider,
+                "test"
+            ).send();
+        
+            String contractAddress = contract.getContractAddress();
+            log.info("Smart contract deployed to address " + contractAddress);
+            //   log.info("View contract at https://rinkeby.etherscan.io/address/" + contractAddress);
+        }
+        return "true";
+    }
+
+    String contractAddress = "0x300f6b40c55a01adce9f33de1e615d03f28134df"; //要手動更新 deploy 後的 contract address
+    @RequestMapping("/listenEvent")
+    @ResponseBody
+    public String testlistenEvent() throws Exception{
+        webSocketService.connect(); //這樣才會連接上 enode
+        testListenEvent();
+        return "true";
+    }
+
+    void testListenEvent(){
+        //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
+        //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
+        //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
+        //別人範例 https://blog.csdn.net/liuzhijun301/article/details/80240437
+        //範例與問題 https://ethereum.stackexchange.com/questions/51958/subscribing-to-event-using-web3j
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, contractAddress.substring(2));
+        // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
+        String encodedEventSignature = EventEncoder.encode(Greeter.MODIFIED_EVENT);
+        filter.addSingleTopic(encodedEventSignature);
+        log.info("subscribing to event with filter");
+        web3j.ethLogFlowable(filter).subscribe(eventString -> {
+            log.info("event string= " + eventString.toString());
+        });
+    }
+
+    @RequestMapping("/sendEvent")
+    @ResponseBody
+    public String sendEvent() throws Exception{
+        //webSocketService.connect(); //這樣才會連接上 enode，好像只需要(也只能) call 一次
         TransactionManager transactionManager2 = new ClientTransactionManager(web3j, ganacheAddress);//transaction manager
 
         //要用 unlock 的方式作法 https://web3j.readthedocs.io/en/latest/transactions.html#transaction-signing-via-an-ethereum-client
         //官方 example https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/DeployContractIT.java
         PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(ganacheAddress, "1234", BigInteger.valueOf(500) ).send();
-            if (personalUnlockAccount.accountUnlocked()) {
-                // send a transaction
+        if (personalUnlockAccount.accountUnlocked()) {
+            // send a transaction
+            Greeter GreeterContract = Greeter.load(
+                contractAddress, web3j, transactionManager2, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+        
+            log.info("Value stored in remote smart contract: " + GreeterContract.greet().send());
 
-                ContractGasProvider contractGasProvider = new DefaultGasProvider();
-                Greeter contract = Greeter.deploy(
-                        web3jAdmin,
-                        transactionManager2,
-                        contractGasProvider,
-                        "test"
-                ).send();
+            // Lets modify the value in our smart contract
+            TransactionReceipt transactionReceipt = GreeterContract.newGreeting("Well hello again").send();
         
-                String contractAddress = contract.getContractAddress();
-                log.info("Smart contract deployed to address " + contractAddress);
-                //   log.info("View contract at https://rinkeby.etherscan.io/address/" + contractAddress);
-        
-                log.info("Value stored in remote smart contract: " + contract.greet().send());
-        
-                // Lets modify the value in our smart contract
-                TransactionReceipt transactionReceipt = contract.newGreeting("Well hello again").send();
-        
-                log.info("New value stored in remote smart contract: " + contract.greet().send());
-                
-            }
+            log.info("New value stored in remote smart contract: " + GreeterContract.greet().send());
+        }
         return "true";
     }
+    
 
+    @PostMapping("/copy2")
+    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    public String copy(@RequestBody String object, @RequestBody int score) throws Exception{
+        //@RequestParam 是給 url 放參數用
+
+        return object + score;
+    }
+
+    @PostMapping("/copy3")
+    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    public String copy(@RequestBody String object, Model m) throws Exception{
+        //@RequestParam 是給 url 放參數用
+
+        return object;
+    }
+
+
+
+
+    //============================================
+    //======== start of contract function ========
+    //============================================
 
     String healthTx = "";
     //將 request 存到 eth smartcontract
@@ -364,18 +429,11 @@ public class HelloController {
         filter.addSingleTopic(encodedEventSignature);
         log.info("subscribing to event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
-            log.info("event string= ", eventString.toString());
+            log.info("event string= " + eventString.toString());
         });
     }
     //合約wrapper 的功能，研究中
     //RequestListContract.copy_eventEventFlowable(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST);
 
 
-    @PostMapping("/copy2")
-    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
-    public String copy(@RequestBody String object, @RequestBody int score) throws Exception{
-        //@RequestParam 是給 url 放參數用
-
-        return object + score;
-    }
 }

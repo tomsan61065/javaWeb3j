@@ -266,6 +266,19 @@ a {
   </style>
 </head>
 <body>
+
+
+<!-- 測試與前端互動用 -->
+<div id="copy3" class="inner">
+  <!-- 這個好像是 JSP 的用語
+  <form action="<c:url value="/copy3" />" method="GET"> 
+  -->
+  <form id="copy3" action="/copy3" method="POST">
+    <input type="submit" name="action" value="save" />
+  </form>
+</div>
+
+
 <div class="content">
   <div class="title" id="title">Send Copy Request</div>
   <div id="copyRequest" class="inner">
