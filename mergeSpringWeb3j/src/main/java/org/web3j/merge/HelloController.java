@@ -42,14 +42,15 @@ import org.web3j.protocol.websocket.*;
 import org.web3j.protocol.websocket.WebSocketClient;
 import org.web3j.protocol.websocket.WebSocketListener;
 import org.web3j.protocol.websocket.WebSocketService;
-import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.protocol.admin.*;
 import org.web3j.protocol.admin.methods.response.PersonalUnlockAccount;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.request.EthFilter;
-import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.request.*;
+import org.web3j.protocol.core.methods.response.*;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
 import org.web3j.protocol.core.methods.response.EthLog;
 import org.web3j.protocol.core.methods.response.Log;
@@ -161,7 +162,7 @@ public class HelloController {
     /* <--------------------------------------------------------------------------------------------------> */
     @RequestMapping("/")
     public String index() throws Exception{
-        listenEvent();
+        
         /*
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
@@ -278,7 +279,7 @@ public class HelloController {
 
     }
 
-    String ganacheAddress = "0x0e07d6c906341eab3558ba9d3db251e7826b0b3c"; //每次重開 ganache 都要改成上面存在的 address
+    String ganacheAddress = "0x7f9473ade6f1721356c95ca652333e15eafbda32"; //每次重開 ganache 都要改成上面存在的 address
     @RequestMapping("/deploy")
     @ResponseBody
     public String deployContract() throws Exception{
@@ -307,7 +308,7 @@ public class HelloController {
         return "true";
     }
 
-    String contractAddress = "0x300f6b40c55a01adce9f33de1e615d03f28134df"; //要手動更新 deploy 後的 contract address
+    String contractAddress = "0x4ca30e5255c0eaec4caa0cd582c1ed667e2f3a04"; //要手動更新 deploy 後的 contract address
     @RequestMapping("/listenEvent")
     @ResponseBody
     public String testlistenEvent() throws Exception{
@@ -329,6 +330,18 @@ public class HelloController {
         log.info("subscribing to event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
             log.info("event string= " + eventString.toString());
+            log.info(eventString.getTransactionHash());
+            log.info(eventString.getData());
+
+            //https://github.com/web3j/web3j/blob/9ac2c051ad9fcb54c57b5ebf3431952bf2f64884/core/src/main/java/org/web3j/protocol/core/methods/response/EthGetTransactionReceipt.java
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( eventString.getTransactionHash() ).send();
+            //https://web3j.readthedocs.io/en/latest/transactions.html#recommended-approach-for-working-with-smart-contracts
+            //文件上面是錯的...
+            if (transactionReceipt.getTransactionReceipt().isPresent()) {
+                log.info(transactionReceipt.getResult().toString());
+            } else {
+                // try again
+            }
         });
     }
 
@@ -365,8 +378,9 @@ public class HelloController {
         return object + score;
     }
 
+    //測試能否從前端接收參數
     @PostMapping("/copy3")
-    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    @ResponseBody 
     public String copy(@RequestBody String object, Model m) throws Exception{
         //@RequestParam 是給 url 放參數用
 
@@ -383,8 +397,8 @@ public class HelloController {
     String healthTx = "";
     //將 request 存到 eth smartcontract
     @PostMapping("/copy")
-    //@ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
-    public String copy(@RequestBody Copy _copy) throws Exception{
+    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    public String copy(String Eth, String Corda, String AssetIndex) throws Exception{//自動 mapping 變數名稱
         //@RequestParam 是給 url 放參數用
         
         
@@ -396,9 +410,11 @@ public class HelloController {
         //要連接 ganache 就沒有 wallet，直接給 privateKey
     //    Credentials credentials = Credentials.create("0x3a2b91d1cc8da46bfbf03f8b92aebbbbac452243195e0c4511bd48dd3a8c0648");
     //    log.info("Credentials loaded");
-        log.info(_copy.object);
-        log.info(_copy.Eth + " " + _copy.Corda);
-        if(_copy.Eth == null && _copy.Corda == null){
+        //log.info(_copy.object);
+        log.info("ETH:" + Eth + ", Corda:" + Corda + ", AssetIndex:" + AssetIndex);
+        //log.info(_copy.Eth + " " + _copy.Corda);
+        //if(_copy.Eth == null && _copy.Corda == null){
+        if(Eth == null && Corda == null){
             log.info("Eth&Corda null");
             String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
@@ -414,7 +430,8 @@ public class HelloController {
             }
         }
         //return "Done.html";
-        return _copy.object + _copy.score;
+        //return _copy.object + _copy.score;
+        return "true";
     }
 
     void listenEvent(){
@@ -430,6 +447,16 @@ public class HelloController {
         log.info("subscribing to event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
             log.info("event string= " + eventString.toString());
+            log.info(eventString.getTransactionHash());
+            
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( eventString.getTransactionHash() ).send();
+            
+            if (transactionReceipt.getTransactionReceipt().isPresent()) {
+                log.info(transactionReceipt.getResult().toString());
+            } else {
+                // try again
+            }
+
         });
     }
     //合約wrapper 的功能，研究中
