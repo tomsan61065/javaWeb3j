@@ -341,6 +341,7 @@ public class HelloController {
                 log.info(transactionReceipt.getResult().toString());
             } else {
                 // try again
+
             }
         });
     }
@@ -414,7 +415,7 @@ public class HelloController {
         log.info("ETH:" + Eth + ", Corda:" + Corda + ", AssetIndex:" + AssetIndex);
         //log.info(_copy.Eth + " " + _copy.Corda);
         //if(_copy.Eth == null && _copy.Corda == null){
-        if(Eth == null && Corda == null){
+        if(Eth != null && Corda != null){
             log.info("Eth&Corda null");
             String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
@@ -462,5 +463,41 @@ public class HelloController {
     //合約wrapper 的功能，研究中
     //RequestListContract.copy_eventEventFlowable(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST);
 
+    //transfer
+    // Corda 凍結，發送要 transfer (Corda timeout 一天)
+    // ETH 收到，建立資產 
+    // Corda time out 到了，檢查 ETH 有無建立成功，有就消滅，沒有就解凍
 
+    // ETH 凍結，發送要 transfer (等半天)
+    // Corda 收到，建立資產並凍結。對 ETH 發出成功 (Corda timeout 一天)
+    // ETH 收到就會移除資產，沒收到 ETH 會先 timeout 並解凍
+    // Corda timeout 到了，檢查 ETH 有無移除成功，有就解凍，沒有就 rollback(消滅)
+    
+    @PostMapping("/transfer")
+    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    public String copy(String Eth, String Corda, String AssetIndex) throws Exception{//自動 mapping 變數名稱
+        
+        log.info("ETH:" + Eth + ", Corda:" + Corda + ", AssetIndex:" + AssetIndex);
+        //log.info(_copy.Eth + " " + _copy.Corda);
+        //if(_copy.Eth == null && _copy.Corda == null){
+        if(Eth != null && Corda != null){
+            log.info("Eth&Corda null");
+
+            //RequestList.methods.addTransferRequest(AssetList_Address, notary, req.body.Corda, req.body.AssetIndex).send({from: NotaryAgent, gas: 6721974})
+
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(NotaryAgent, "????", BigInteger.valueOf(500) ).send();
+            if (personalUnlockAccount.accountUnlocked()) {
+                // send a transaction
+                TransactionReceipt transactionReceipt = RequestListContract.addTransferRequest(AssetList_Address, notary, Corda, BigInteger.valueOf(AssetIndex) ).send();
+                log.info("-----------------Add Transfer Request-------------------"); 
+                log.info("Ethereum Account: AliceETH")
+                log.info("Corda Account: BobCORDA");
+                
+                return "Done.html";
+            }
+        }
+        //return "Done.html";
+        //return _copy.object + _copy.score;
+        return "true";
+    }
 }
