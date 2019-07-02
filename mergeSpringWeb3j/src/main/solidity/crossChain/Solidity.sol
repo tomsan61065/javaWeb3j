@@ -24,6 +24,7 @@ contract AssetList{
     struct USdollar{
         address owner;
         uint amount;
+        bool freeze;
     }
     USdollar[] USdollar_List;
     
@@ -50,7 +51,7 @@ contract AssetList{
     function addAsset_USdollar(address owner, uint amount) public {
         // if(Contract_Owner != msg.sender) return;
         
-        USdollar memory a = USdollar(owner, amount);
+        USdollar memory a = USdollar(owner, amount, false);
         USdollar_List.push(a);
     }
     function addAsset_Land(address owner, uint value) public {
@@ -92,6 +93,9 @@ contract AssetList{
     function ChangeStatusOfCar(uint i, bool freeze) public {
         Car_List[i].freeze = freeze;
     }
+    function ChangeStatusOfUSdollar(uint i, bool freeze) public {
+        USdollar_List[i].freeze = freeze;
+    }
     function ChangeOwnerOfUSdollar(uint i, address newOwner) public {
         // if(Contract_Owner == msg.sender){
         //     USdollar_List[i].owner = newOwner;
@@ -126,23 +130,27 @@ contract AssetList{
         }
         return(Health_List.length, addressList, ageList);
     }
-    function queryCarAsset() view public returns(uint, address[] memory, uint[] memory){
+    function queryCarAsset() view public returns(uint, address[] memory, uint[] memory, bool[] memory){
         address[] memory addressList = new address[](Car_List.length);
         uint[] memory licenseList = new uint[](Car_List.length);
+        bool[] memory freezeList = new bool[](Car_List.length);
         for(uint i = 0; i < Car_List.length; i++){
             addressList[i] = Car_List[i].owner;
             licenseList[i] = Car_List[i].license;
+            freezeList[i] = Car_List[i].freeze;
         }
-        return(Car_List.length, addressList, licenseList);
+        return(Car_List.length, addressList, licenseList, freezeList);
     }
-    function queryUSdollarAsset() view public returns(uint, address[] memory, uint[] memory){
+    function queryUSdollarAsset() view public returns(uint, address[] memory, uint[] memory, bool[] memory){
         address[] memory addressList = new address[](USdollar_List.length);
         uint[] memory amountList = new uint[](USdollar_List.length);
+        bool[] memory freezeList = new bool[](USdollar_List.length);
         for(uint i = 0; i < USdollar_List.length; i++){
             addressList[i] = USdollar_List[i].owner;
             amountList[i] = USdollar_List[i].amount;
+            freezeList[i] = USdollar_List[i].freeze;
         }
-        return(USdollar_List.length, addressList, amountList);
+        return(USdollar_List.length, addressList, amountList, freezeList);
     }
     function queryLandAsset() view public returns(uint, address[] memory, uint[] memory, uint[] memory){
         address[] memory addressList = new address[](Land_List.length);
@@ -170,6 +178,11 @@ contract AssetList{
         for(uint i = 0; i < Car_List.length; i++){
             if(Car_List[i].freeze){
                 Car_List[i].freeze = false;
+            }
+        }
+        for(uint i = 0; i < USdollar_List.length; i++){
+            if(USdollar_List[i].freeze){
+                USdollar_List[i].freeze = false;
             }
         }
     }
@@ -203,10 +216,7 @@ contract RequestList{
         uint EthAsset_Index;
         string CordaAsset_Index;
         address SenderETH;
-        string SenderCORDA;
         address ReceiverETH;
-        string ReceiverCORDA;
-        uint Status;
     }
     ExchangeRequest[] _exchange;
     
@@ -254,11 +264,13 @@ contract RequestList{
     }
     
     event exchange_event(bytes32 assetTx, bytes32 requestTx);
-    function addExchangeRequest(address AssetContractAddress, address SenderETH, string memory SenderCORDA, address ReceiverETH, string memory ReceiverCORDA, uint ETHIndex, string memory CORDAIndex) public {
+    function addExchangeRequest(address AssetContractAddress, address SenderETH, address ReceiverETH, uint ETHIndex, string memory CORDAIndex) public {
         AssetList al = AssetList(AssetContractAddress);
         
         if(al.USdollarValidation(SenderETH, ETHIndex)){
-            ExchangeRequest memory a = ExchangeRequest(ETHIndex, CORDAIndex, SenderETH, SenderCORDA, ReceiverETH, ReceiverCORDA, 0);
+            al.ChangeStatusOfUSdollar(ETHIndex, true);
+            
+            ExchangeRequest memory a = ExchangeRequest(ETHIndex, CORDAIndex, SenderETH, ReceiverETH);
             _exchange.push(a);
         }
     }
@@ -313,14 +325,23 @@ contract RequestList{
             _transfer[i].Status = Status;
         }
     }
-    function changeExchangeStatus(uint i, uint Status) public {
-        if(Contract_Owner == msg.sender){
-            _exchange[i].Status = Status;
-        }
-    }
+    // function changeExchangeStatus(uint i, uint Status) public {
+    //     if(Contract_Owner == msg.sender){
+    //         _exchange[i].Status = Status;
+    //     }
+    // }
     function changeEncumbranceStatus(uint i, uint Status) public {
         if(Contract_Owner == msg.sender){
             _encumbrance[i].Status = Status;
+        }
+    }
+    
+    function ChangeOwnerOfUSdollar(address AssetContractAddress, uint EthIndex) public {
+        AssetList al = AssetList(AssetContractAddress);
+        for(uint i = 0; i < _exchange.length; i++){
+            if(_exchange[i].EthAsset_Index == EthIndex){
+                al.ChangeOwnerOfUSdollar(EthIndex, _exchange[i].ReceiverETH);
+            }
         }
     }
 }
@@ -346,25 +367,30 @@ contract TxValidation{
                al.addAsset_Car(owner, asset); 
            }
        }
-       else{
-           revert('Request Fail!');
-       }
+      else{
+          revert('Request Fail!');
+      }
    }
    
-   function verifyResponse(address AssetContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, uint EthIndex, uint action, bool status) public {
+   function verifyResponse(address AssetContractAddress, address RequestContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, uint EthIndex, uint action, uint status) public {
        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
        bytes32 prefixedValue = keccak256(abi.encodePacked(prefix, testStringBytes));
        if(ecrecover(prefixedValue, v, r, s) == Notary){
            AssetList al = AssetList(AssetContractAddress);
+           RequestList ql = RequestList(RequestContractAddress);
            if(action == 1){
-               if(status){
-                   al.deleteCarAsset(EthIndex);
+               al.deleteCarAsset(EthIndex);
+           }
+           else if(action == 2){
+               if(status == 0){
+                   ql.ChangeOwnerOfUSdollar(AssetContractAddress, EthIndex);
                }
-               else{
-                   al.unfreezeCarAsset(EthIndex);
-               }
+               al.ChangeStatusOfUSdollar(EthIndex, false);
            }
        }
+      else{
+          revert('Response Fail!');
+      }
    }
    
    function verify2(bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s) pure public returns(address) {

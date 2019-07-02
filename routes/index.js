@@ -22,22 +22,23 @@ let braid = new Proxy({
 /* <--------------------------------------------------------------------------------------------------> */
 const Web3 = require('web3');
 // const ethereumUri = 'http://140.119.164.28:8000';
-const ethereumUri = 'http://140.119.101.130:7575';
-let web3 = new Web3(new Web3.providers.HttpProvider(ethereumUri));
-// let web3 = new Web3(new Web3.providers.WebsocketProvider(ethereumUri));
+// const ethereumUri = 'http://140.119.101.130:7576';
+// let web3 = new Web3(new Web3.providers.HttpProvider(ethereumUri));
+const ethereumUri = 'ws://140.119.101.130:7576';
+let web3 = new Web3(new Web3.providers.WebsocketProvider(ethereumUri));
 
 let NotaryAgent = '0x76ac34807210d52fcbfc0412cf4da5c672214752';
 
 let AssetList_ABI = require("../../Contract/AssetList_ABI.js");
-let AssetList_Address = '0x0bfd6d60bdadbbd3dfed87afbe505761708973c4';
+let AssetList_Address = '0xfe41eb5337bd127ec171b24ebed1ee88d2c641d1';
 var AssetList = new web3.eth.Contract(AssetList_ABI, AssetList_Address);
 
 let RequestList_ABI = require("../../Contract/RequestList_ABI.js");
-let RequestList_Address = '0x8e4d2082152a624ef441a3d425d62fba1711fe1d';
+let RequestList_Address = '0x8ee1b13652c8695c22a7e4372cf781fa5a540b2a';
 var RequestList = new web3.eth.Contract(RequestList_ABI, RequestList_Address);
 
 let Validation_ABI = require("../../Contract/Validation_ABI.js");
-let Validation_Address = '0x89bce2f68f18f087728917b9db91b69c89633968';
+let Validation_Address = '0xbf9ec3840043132efdfea54eb1850297f7fc879f';
 var Validation = new web3.eth.Contract(Validation_ABI, Validation_Address);
 
 const AliceETH = '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2';
@@ -54,59 +55,39 @@ const msgHash = "0xafecccaa184461341805019494d1d706dbdc4a89";
 const myParser = require('body-parser');
 const app = express();
 const fs = require('fs');
+
+
+/* <--------------------------------------------------------------------------------------------------> */
+//Log file
+// const logTime = new Date().toLocaleTimeString()
+let stream = fs.createWriteStream("relayer-server/routes/log.txt", {flags:'a'});
+function writeToLog(obj){
+    stream.write(obj + "\n");
+}
+
+
+
 app.use(myParser.urlencoded({extended: true}));
 app.use(express.static(__dirname + '/views'));
 app.get('/', function(req, res){
     res.sendFile(__dirname + '/views/Home.html');
 });
 
+var healthTx = "";
 // Store request from UI into RequestList smart contract on Ethereum.
 app.post('/copy', function(req, res){
     if(req.body.Eth != "" && req.body.Corda != ""){
-        // RequestList.methods.addCopyRequest(AssetList_Address, '0xe6a31739cdda7a55ab7a1a62b719279c7c144df6', req.body.Corda, req.body.AssetIndex).send({from: NotaryAgent, gas: 6721974})
-        // .then(function(receipt){
-        //     console.log("-----------------Add Copy Request-------------------");
-        //     console.log("Ethereum Account: " + 'AliceETH');
-        //     console.log("Corda Account: " + 'BobCORDA');
-        //     // console.log(receipt.events.copy_event);
-        // });
-        var CopyRequestTxs = {
-            table: []
-        };
-        let hash = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
-        web3.eth.personal.unlockAccount('0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2', "1234", 500)
+        web3.eth.personal.unlockAccount(AliceETH, "1234", 500)
         .then(function(){
-            RequestList.methods.addCopyRequest(AssetList_Address, '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2', 'Alice', 0).send({from:'0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2', gas: 6721974})
+            RequestList.methods.addCopyRequest(AssetList_Address, AliceETH, 'BobCORDA', req.body.AssetIndex).send({from:AliceETH, gas: 6721974})
             .then(function(receipt){
-                console.log("--------------- " + '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2' + " send a copy request ---------------");
-                console.log(receipt);
+                console.log("[user] AliceETH" + " send a copy request");
+                writeToLog("[user] AliceETH" + " send a copy request")
 
-                web3.eth.getTransaction(receipt.transactionHash)
-                .then(function(e){
-                    CopyRequestTxs.table.push({
-                        blockHash:e.blockHash, 
-                        blockNumber:e.blockNumber, 
-                        from:e.from, 
-                        gas:e.gas, 
-                        gasPrice:e.gasPrice, 
-                        hash:e.hash, 
-                        input:e.input,
-                        nonce:e.nonce, 
-                        to:e.to, 
-                        tansactionIndex:e.trancsactionIndex,  
-                        value:e.value, 
-                        v:e.v, 
-                        r:e.r, 
-                        s:e.s,
-                        Sender:'0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2',
-                        Receiver:'BobCORDA',
-                        AssetTx:hash
-                    });
-                    let filePath = 'notary-server/routes/CopyRequestTxs.json';
-                    var jCopyRequest = JSON.stringify(CopyRequestTxs);
-                    fs.writeFile(filePath, jCopyRequest, 'utf8', function(){
-                        // console.log('New Copy Request!!!');
-                    });
+                RequestList.methods.emitCopyEvent(healthTx, receipt.transactionHash).send({from:AliceETH, gas: 6721974})
+                .then(function(){
+                    console.log("[relayer] send 2 Transactions receipt for Copy");
+                    writeToLog("[relayer] send 2 Transactions receipt for Copy")
 
                     res.sendFile(__dirname + '/views/Done.html');
                 });
@@ -114,74 +95,500 @@ app.post('/copy', function(req, res){
         });
     }
 });
+RequestList.events.copy_event(function(error, event){
+    var Health_Certificate = {
+        table: []
+    };
+    var Health_Receipt = {
+        table: []
+    };
+    var CopyRequestTxs = {
+        table: []
+    };
+    var CopyReceipt = {
+        table: []
+    };
+    if(!error){
+        let assetTx = event['returnValues']['assetTx'];
+        let requestTx = event['returnValues']['requestTx'];
+        console.log('[relayer] get copy event');
+
+        web3.eth.getTransaction(assetTx)
+        .then(function(e){
+            Health_Certificate.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice:e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s
+            });
+            let filePath = 'relayer-server/routes/Health_Certificate.json';
+            var Health = JSON.stringify(Health_Certificate);
+            fs.writeFile(filePath, Health, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+        web3.eth.getTransactionReceipt(assetTx)
+        .then(function(e){
+            Health_Receipt.table.push({
+                status:e.status, 
+                transactionHash:e.transactionHash, 
+                transactionIndex:e.transactionIndex, 
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                contractAddress:e.contractAddress, 
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/Health_Receipt.json';
+            var Receipt = JSON.stringify(Health_Receipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+
+        web3.eth.getTransaction(requestTx)
+        .then(function(e){
+            CopyRequestTxs.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice:e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s,
+                AssetTx:assetTx
+            });
+            let filePath = 'relayer-server/routes/CopyRequestTxs.json';
+            var Request = JSON.stringify(CopyRequestTxs);
+            fs.writeFile(filePath, Request, 'utf8', function(){
+                // console.log('New Copy Request!!!');
+            });
+        });
+        web3.eth.getTransactionReceipt(requestTx)
+        .then(function(e){
+            CopyReceipt.table.push({
+                status:e.status,
+                transactionHash:e.transactionHash,
+                transactionIndex:e.transactionIndex,
+                blockHash:e.blockHash,
+                blockNumber:e.blockNumber,
+                contractAddress:e.contractAddress,
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/CopyReceipt.json';
+            var Receipt = JSON.stringify(CopyReceipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+    }else{
+        console.log(error);
+    }
+})
+let carTx = "";
 app.post('/transfer', function(req, res){
     if(req.body.Eth != "" && req.body.Corda != ""){
-        RequestList.methods.addTransferRequest(AssetList_Address, '0xe6a31739cdda7a55ab7a1a62b719279c7c144df6', req.body.Corda, req.body.AssetIndex).send({from: NotaryAgent, gas: 6721974})
+        web3.eth.personal.unlockAccount(AliceETH, "1234", 500)
         .then(function(){
-            console.log("-----------------Add Transfer Request-------------------");
-            console.log("Ethereum Account: " + 'AliceETH');
-            console.log("Corda Account: " + 'BobCORDA');
+            RequestList.methods.addTransferRequest(AssetList_Address, AliceETH, 'BobCORDA', req.body.AssetIndex).send({from:AliceETH, gas: 6721974})
+            .then(function(receipt){
+                console.log("[user] AliceETH" + " send a transfer request");
+                writeToLog("[user] AliceETH" + " send a transfer request")
+
+                RequestList.methods.emitTransferEvent(carTx, receipt.transactionHash).send({from:AliceETH, gas: 6721974})
+                .then(function(){
+                    console.log("[relayer] send 2 Transactions receipt for Transfer");
+                    writeToLog("[relayer] send 2 Transactions receipt for Transfer")
+                    res.sendFile(__dirname + '/views/Done.html');
+                });
+            });
         });
     }
-
-    // res.send("You sent a request!!");
-    res.sendFile(__dirname + '/views/Done.html');
 });
+RequestList.events.transfer_event(function(error, event){
+    var Car_Certificate = {
+        table: []
+    };
+    var Car_Receipt = {
+        table: []
+    };
+    var TransferRequestTxs = {
+        table: []
+    };
+    var TransferReceipt = {
+        table: []
+    };
+    if(!error){
+        let assetTx = event['returnValues']['assetTx'];
+        let requestTx = event['returnValues']['requestTx'];
+        console.log('[relayer] get transfer event');
+
+        web3.eth.getTransaction(assetTx)
+        .then(function(e){
+            Car_Certificate.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice: e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s
+            });
+            let filePath = 'relayer-server/routes/Car_Certificate.json';
+            var Health = JSON.stringify(Car_Certificate);
+            fs.writeFile(filePath, Health, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+        web3.eth.getTransactionReceipt(assetTx)
+        .then(function(e){
+            Car_Receipt.table.push({
+                status:e.status, 
+                transactionHash:e.transactionHash, 
+                transactionIndex:e.transactionIndex, 
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                contractAddress:e.contractAddress, 
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/Car_Receipt.json';
+            var Receipt = JSON.stringify(Car_Receipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+
+        web3.eth.getTransaction(requestTx)
+        .then(function(e){
+            TransferRequestTxs.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice:e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s,
+                AssetTx:assetTx
+            });
+            let filePath = 'relayer-server/routes/TransferRequestTxs.json';
+            var Request = JSON.stringify(TransferRequestTxs);
+            fs.writeFile(filePath, Request, 'utf8', function(){
+                // console.log('New Copy Request!!!');
+            });
+
+            // res.sendFile(__dirname + '/views/Done.html');
+        });
+        web3.eth.getTransactionReceipt(requestTx)
+        .then(function(e){
+            TransferReceipt.table.push({
+                status:e.status, 
+                transactionHash:e.transactionHash, 
+                transactionIndex:e.transactionIndex, 
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                contractAddress:e.contractAddress, 
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/TransferReceipt.json';
+            var Receipt = JSON.stringify(TransferReceipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+    }else{
+        console.log(error);
+    }
+})
+let usTx = "";
 app.post('/exchange', function(req, res){
     if(req.body.Eth1 != "" && req.body.Corda1 != "" && req.body.Eth2 != "" && req.body.Corda2 != ""){
-        RequestList.methods.addExchangeRequest(AssetList_Address, '0xe6a31739cdda7a55ab7a1a62b719279c7c144df6', req.body.Corda1, '0xBf3AA7d5ADAA5D2b110a71fcd9dE1E73faf23341', req.body.Corda2, req.body.USIndex, req.body.CarIndex).send({from: NotaryAgent, gas: 6721974})
+        web3.eth.personal.unlockAccount(AliceETH, "1234", 500)
         .then(function(){
-            console.log("-----------------Add Exchange Request-------------------");
-            console.log("Your Ethereum Account: " + 'AliceETH');
-            console.log("Your Corda Account: " + 'AliceCORDA');
-            console.log("Others Ethereum Account: " + 'BobETH');
-            console.log("Others Corda Account: " + 'BobCORDA');
+            RequestList.methods.addExchangeRequest(AssetList_Address, AliceETH, BobETH, req.body.USIndex, req.body.CarIndex).send({from:AliceETH, gas: 6721974})
+            .then(function(receipt){
+                console.log("[user] AliceETH" + " send a exchange request");
+                writeToLog("[user] AliceETH" + " send a exchange request")
+
+                RequestList.methods.emitExchangeEvent(usTx, receipt.transactionHash).send({from:AliceETH, gas: 6721974})
+                .then(function(){
+                    console.log("[relayer] send 2 Transactions receipt for Exchange");
+                    writeToLog("[relayer] send 2 Transactions receipt for Exchange")
+
+                    res.sendFile(__dirname + '/views/Done.html');
+                });
+            });
         });
     }
-
-    // res.send("You sent a request!!");
-    res.sendFile(__dirname + '/views/Done.html');
 });
+RequestList.events.exchange_event(function(error, event){
+    var US_Certificate = {
+        table: []
+    };
+    var US_Receipt = {
+        table: []
+    };
+    var ExchangeRequestTxs = {
+        table: []
+    };
+    var ExchangeReceipt = {
+        table: []
+    };
+    if(!error){
+        let assetTx = event['returnValues']['assetTx'];
+        let requestTx = event['returnValues']['requestTx'];
+        console.log('[relayer] get exchange event');
+
+        web3.eth.getTransaction(assetTx)
+        .then(function(e){
+            US_Certificate.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice: e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s
+            });
+            let filePath = 'relayer-server/routes/US_Certificate.json';
+            var US = JSON.stringify(US_Certificate);
+            fs.writeFile(filePath, US, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+        web3.eth.getTransactionReceipt(assetTx)
+        .then(function(e){
+            US_Receipt.table.push({
+                status:e.status, 
+                transactionHash:e.transactionHash, 
+                transactionIndex:e.transactionIndex, 
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                contractAddress:e.contractAddress, 
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/US_Receipt.json';
+            var Receipt = JSON.stringify(US_Receipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+
+        web3.eth.getTransaction(requestTx)
+        .then(function(e){
+            ExchangeRequestTxs.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice:e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s,
+                AssetTx:assetTx
+            });
+            let filePath = 'relayer-server/routes/ExchangeRequestTxs.json';
+            var Request = JSON.stringify(ExchangeRequestTxs);
+            fs.writeFile(filePath, Request, 'utf8', function(){
+                // console.log('New Copy Request!!!');
+            });
+
+            // res.sendFile(__dirname + '/views/Done.html');
+        });
+        web3.eth.getTransactionReceipt(requestTx)
+        .then(function(e){
+            ExchangeReceipt.table.push({
+                status:e.status, 
+                transactionHash:e.transactionHash, 
+                transactionIndex:e.transactionIndex, 
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                contractAddress:e.contractAddress, 
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/ExchangeReceipt.json';
+            var Receipt = JSON.stringify(ExchangeReceipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+                // console.log('New Health Asset!!!');
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+    }else{
+        console.log(error);
+    }
+})
+RequestList.events.noticeMsg(function(error, event){
+    console.log('[user] Alice get notice message');
+    let index = event['returnValues']['index']
+    web3.eth.personal.unlockAccount(AliceETH, "1234", 500)
+    .then(function(){
+        RequestList.methods.askingCordaMsg(index).send({from: AliceETH, gas: 6721974})
+        .then(function (receipt) {
+            // console.log("[TimeOracle] Rollback asset.")
+            RequestList.methods.emitEncumbranceEvent(receipt.transactionHash).send({from: AliceETH, gas: 6721974})
+            .then(function(e){
+                        
+            })
+        })
+    })
+})
+var asking_Certificate = {
+    table: []
+};
+var asking_Receipt = {
+    table: []
+};
+RequestList.events.encumbrance_event(function(error, event){
+    console.log('[relayer] get Alice notice event');
+    writeToLog('[relayer] get Alice notice event')
+    if(!error){
+        let Tx = event['returnValues']['Tx'];
+
+        web3.eth.getTransaction(Tx)
+        .then(function(e){
+            asking_Certificate.table.push({
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                from:e.from, 
+                gas:e.gas, 
+                gasPrice: e.gasPrice, 
+                hash:e.hash, 
+                input:e.input,
+                nonce:e.nonce, 
+                to:e.to, 
+                tansactionIndex:e.trancsactionIndex,  
+                value:e.value, 
+                v:e.v, 
+                r:e.r, 
+                s:e.s
+            });
+            let filePath = 'relayer-server/routes/asking_Certificate.json';
+            var asking = JSON.stringify(asking_Certificate);
+            fs.writeFile(filePath, asking, 'utf8', function(){
+                
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+        web3.eth.getTransactionReceipt(Tx)
+        .then(function(e){
+            asking_Receipt.table.push({
+                status:e.status, 
+                transactionHash:e.transactionHash, 
+                transactionIndex:e.transactionIndex, 
+                blockHash:e.blockHash, 
+                blockNumber:e.blockNumber, 
+                contractAddress:e.contractAddress, 
+                cumulativeGasUsed:e.cumulativeGasUsed,
+                logs:e.logs
+            });
+            let filePath = 'relayer-server/routes/asking_Receipt.json';
+            var Receipt = JSON.stringify(asking_Receipt);
+            fs.writeFile(filePath, Receipt, 'utf8', function(){
+
+            });
+            // res.sendFile(__dirname + '/views/Done.html');
+        })
+    }else{
+        console.log(error);
+    }
+})
 app.post('/newAsset', function(req, res){
     res.sendFile(__dirname + '/views/NewAsset.html');
 });
-var Health_Certificate = {
-    table: []
-};
 app.post('/Newhealth', function(req, res){
     if(req.body.owner != "" && req.body.asset != ""){
-        web3.eth.personal.unlockAccount('0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2', "1234", 600)
+        web3.eth.personal.unlockAccount(AliceETH, "1234", 600)
         .then(function(){
-            AssetList.methods.addAsset_Health('0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2', '18').send({from: '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2'})
+            AssetList.methods.addAsset_Health(AliceETH, req.body.asset).send({from: AliceETH})
             .then(function(e){
-                console.log("--------------- " + '0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2' + " issue a health asset ---------------");
-                console.log(e);
-
-                web3.eth.getTransaction(e.transactionHash)
-                .then(function(e){
-                    Health_Certificate.table.push({
-                    blockHash:e.blockHash, 
-                    blockNumber:e.blockNumber, 
-                    from:e.from, 
-                    gas:e.gas, 
-                    gasPrice: e.gasPrice, 
-                    hash:e.hash, 
-                    input:e.input,
-                    nonce:e.nonce, 
-                    to:e.to, 
-                    tansactionIndex:e.trancsactionIndex,  
-                    value:e.value, 
-                    v:e.v, 
-                    r:e.r, 
-                    s:e.s
-                    });
-                    let filePath = 'notary-server/routes/Health_Certificate.json';
-                    var Health = JSON.stringify(Health_Certificate);
-                    fs.writeFile(filePath, Health, 'utf8', function(){
-                        // console.log('New Health Asset!!!');
-                    });
-                    res.sendFile(__dirname + '/views/Done.html');
-                })
+                healthTx = e.transactionHash;
+                console.log("[user] AliceETH issues a Health asset");
+                writeToLog("[user] AliceETH issues a Health asset")
+                res.sendFile(__dirname + '/views/Done.html');
+            })
+        });
+    }
+});
+app.post('/Newcar', function(req, res){
+    if(req.body.owner != "" && req.body.asset != ""){
+        web3.eth.personal.unlockAccount(AliceETH, "1234", 600)
+        .then(function(){
+            AssetList.methods.addAsset_Car(AliceETH, req.body.asset).send({from: AliceETH})
+            .then(function(e){
+                carTx = e.transactionHash;
+                console.log("[user] AliceETH issues a Car asset");
+                writeToLog("[user] AliceETH issues a Car asset")
+                res.sendFile(__dirname + '/views/Done.html');
+            })
+        });
+    }
+});
+app.post('/Newus', function(req, res){
+    if(req.body.owner != "" && req.body.asset != ""){
+        web3.eth.personal.unlockAccount(AliceETH, "1234", 600)
+        .then(function(){
+            AssetList.methods.addAsset_USdollar(AliceETH, req.body.asset).send({from: AliceETH})
+            .then(function(e){
+                usTx = e.transactionHash;
+                console.log("[user] AliceETH issues a USDollar asset");
+                writeToLog("[user] AliceETH issues a USDollar asset")
+                res.sendFile(__dirname + '/views/Done.html');
             })
         });
     }
@@ -213,7 +620,8 @@ app.post('/car', function(req, res){
         render(__dirname + '/views/Car.html', {
             a : data[0],
             b : data[1],
-            c : data[2]
+            c : data[2],
+            d : data[3]
         }, function(err, data){
             res.send(data);
         });
@@ -225,7 +633,8 @@ app.post('/us', function(req, res){
         render(__dirname + '/views/US.html', {
             a : data[0],
             b : data[1],
-            c : data[2]
+            c : data[2],
+            d : data[3]
         }, function(err, data){
             res.send(data);
         });
@@ -257,7 +666,7 @@ let TransferReqObj = [];
 // Relayer get Blocks per 1 seconds
 setInterval(getBlocksEth, 1000);
 
-const blockPath = 'notary-server/routes/BlockNumber'
+const blockPath = 'relayer-server/routes/BlockNumber'
 var blockNumber;
 fs.access(blockPath, fs.F_OK, (err) => {
     if(err){
@@ -270,17 +679,19 @@ fs.access(blockPath, fs.F_OK, (err) => {
         blockNumber = parseInt(num);
     });
 });
-var Blocks_Info = {
-    table: []
-};
+const BLOCKS_INFO_TABLE_MAX_LENGTH = 5
 function getBlocksEth(){
     web3.eth.getBlockNumber()
     .then(function(num){
+        var Blocks_Info = {
+            table: []
+        };
         if(blockNumber <= num){
             web3.eth.getBlock(blockNumber)
             .then(function(e){
                 // console.log(e);
                 console.log("[Relayer] Get block #" + blockNumber +" from Ethereum.");
+                writeToLog("[Relayer] Get block #" + blockNumber +" from Ethereum.")
                 Blocks_Info.table.push({
                     difficulty:e.difficulty, 
                     extraData:e.extraData, 
@@ -303,9 +714,20 @@ function getBlocksEth(){
                     transactionsRoot:e.transactionsRoot,
                     uncles:e.uncles
                 });
-                let filePath = 'notary-server/routes/Blocks_Info.json';
+                /***
+                 * 2019.6.13 Fix the interrupt of file read by limiting the writing json size.
+                 *  1. fs.writeFile() does not hava writing bound.
+                 *  2. May have something to do with RAM. => https://stackoverflow.com/questions/24153996/is-there-a-limit-on-the-size-of-a-string-in-json-with-node-js
+                 */
+                // console.log("[DEBUG]buffer length: "+Blocks_Info.table.length)
+                let filePath = 'relayer-server/routes/Blocks_Info.json';
                 var jBlock = JSON.stringify(Blocks_Info);
+                // console.log("[DEBUG]JSON length: "+jBlock.length)
                 fs.writeFile(filePath, jBlock, 'utf8', function(){
+                    if (Blocks_Info.table.length > BLOCKS_INFO_TABLE_MAX_LENGTH){
+                        Blocks_Info.table.splice(0,BLOCKS_INFO_TABLE_MAX_LENGTH)
+                    }
+
                     //TODO: writeFile is slow than line242(blockNumber+=1), so this will print 13
                     // console.log("[Relayer] Write block #" + blockNumber +" into file.");
                 });
@@ -316,62 +738,35 @@ function getBlocksEth(){
             });
         }
     });
-    // web3.eth.getBlock(blockNumber)
-    // .then(function(e){
-    //     // console.log(e);
-    //     console.log("[Relayer] Get block #" + blockNumber +" from Ethereum.");
-    //     Blocks_Info.table.push({
-    //         difficulty:e.difficulty, 
-    //         extraData:e.extraData, 
-    //         gasLimit:e.gasLimit, 
-    //         gasUsed:e.gasUsed, 
-    //         hash:e.hash,
-    //         logsBloom:e.logsBloom, 
-    //         miner:e.miner,
-    //         hash:e.hash,
-    //         nonce:e.nonce, 
-    //         number:e.number,  
-    //         parentHash:e.parentHash, 
-    //         receiptsRoot:e.receiptsRoot, 
-    //         sha3Uncles:e.sha3Uncles, 
-    //         size:e.size,
-    //         stateRoot:e.stateRoot,
-    //         timestamp:e.timestamp,
-    //         totalDifficulty:e.totalDifficulty,
-    //         transactions:e.transactions,
-    //         transactionsRoot:e.transactionsRoot,
-    //         uncles:e.uncles
-    //     });
-    //     let filePath = 'notary-server/routes/Blocks_Info.json';
-    //     var jBlock = JSON.stringify(Blocks_Info);
-    //     fs.writeFile(filePath, jBlock, 'utf8', function(){
-    //         //TODO: writeFile is slow than line242(blockNumber+=1), so this will print 13
-    //         // console.log("[Relayer] Write block #" + blockNumber +" into file.");
-    //     });
-    //     fs.writeFile(blockPath, blockNumber, 'utf8', function(){
-    //         // console.log(blockNumber);
-    //     });
-    //     blockNumber += 1;
-    // });
 };
 
-async function ValidationOnEth(msgHash, v, r, s, notary, NewOwner, Asset){
+async function ValidationOnEth(msgHash, v, r, s, notary, NewOwner, Asset, Action, CordaIndex){
     web3.eth.personal.unlockAccount(NotaryAgent, "1234", 500)
     .then(function(){
-        Validation.methods.verify(AssetList_Address, msgHash, v, r, s, notary, NewOwner, Asset).send({from: NotaryAgent})
+        Validation.methods.verify(AssetList_Address, msgHash, v, r, s, notary, NewOwner, Asset, Action, CordaIndex).send({from: NotaryAgent, gas: 6721974})
         .then(function(e){
-            console.log("--------------- " + 'Start Validation on Ethereum' + " ---------------");
-            console.log("msgHash: " + msgHash);
-            console.log("v: " + v);
-            console.log("r: " + r);
-            console.log("s: " + s);
-            console.log("Corda notary" + notary);
-            console.log("Receiver on ETH: " + NewOwner);
-            console.log("Copy Asset: " + Asset);
-            console.log(e);
-            web3.eth.getTransaction(e.transactionHash)
+            console.log("[relayer] Validating Corda  request transaction");
+            writeToLog("[relayer] Validating Corda  request transaction")
+
+            Validation.methods.emitValidationEvent(e.transactionHash, Action).send({from: NotaryAgent})
             .then(function(e){
-                Health_Certificate.table.push({
+
+            });
+        });
+    });
+};
+Validation.events.validation_event(function(error, event){
+    if(!error){
+        if(event['returnValues']['Action'] == 1){
+            var transferRes = {
+                table: []
+            };
+            var transferRes_Receipt = {
+                table: []
+            };
+            web3.eth.getTransaction(event['returnValues']['validationTx'])
+            .then(function(e){
+                transferRes.table.push({
                     blockHash:e.blockHash, 
                     blockNumber:e.blockNumber, 
                     from:e.from, 
@@ -387,257 +782,181 @@ async function ValidationOnEth(msgHash, v, r, s, notary, NewOwner, Asset){
                     r:e.r, 
                     s:e.s
                 });
-                let filePath = 'notary-server/routes/Health_Certificate.json';
-                var Health = JSON.stringify(Health_Certificate);
-                fs.writeFile(filePath, Health, 'utf8', function(){
-                 // console.log('New Health Asset!!!');
+                let filePath = 'relayer-server/routes/transferRes.json';
+                var jTranserRes = JSON.stringify(transferRes);
+                fs.writeFile(filePath, jTranserRes, 'utf8', function(){
+                    // console.log('New Health Asset!!!');
                 });
-            });
+                // res.sendFile(__dirname + '/views/Done.html');
+            })
+            web3.eth.getTransactionReceipt(event['returnValues']['validationTx'])
+            .then(function(e){
+                transferRes_Receipt.table.push({
+                    status:e.status, 
+                    transactionHash:e.transactionHash, 
+                    transactionIndex:e.transactionIndex, 
+                    blockHash:e.blockHash, 
+                    blockNumber:e.blockNumber, 
+                    contractAddress:e.contractAddress, 
+                    cumulativeGasUsed:e.cumulativeGasUsed,
+                    logs:e.logs
+                });
+                let filePath = 'relayer-server/routes/transferRes_Receipt.json';
+                var jtransferRes_Receipt = JSON.stringify(transferRes_Receipt);
+                fs.writeFile(filePath, jtransferRes_Receipt, 'utf8', function(){
+                    // console.log('New Health Asset!!!');
+                });
+                // res.sendFile(__dirname + '/views/Done.html');
+            })
+        }
+        else if(event['returnValues']['Action'] == 2){
+
+        }
+        else if(event['returnValues']['Action'] == 3){
+            var landValue = {
+                table: []
+            };
+            var landValue_Receipt = {
+                table: []
+            };
+            web3.eth.getTransaction(event['returnValues']['validationTx'])
+            .then(function(e){
+                landValue.table.push({
+                    blockHash:e.blockHash, 
+                    blockNumber:e.blockNumber, 
+                    from:e.from, 
+                    gas:e.gas, 
+                    gasPrice: e.gasPrice, 
+                    hash:e.hash, 
+                    input:e.input,
+                    nonce:e.nonce, 
+                    to:e.to, 
+                    tansactionIndex:e.trancsactionIndex,  
+                    value:e.value, 
+                    v:e.v, 
+                    r:e.r, 
+                    s:e.s
+                });
+                let filePath = 'relayer-server/routes/landValue.json';
+                var jlandValue = JSON.stringify(landValue);
+                fs.writeFile(filePath, jlandValue, 'utf8', function(){
+
+                });
+                // res.sendFile(__dirname + '/views/Done.html');
+            })
+            web3.eth.getTransactionReceipt(event['returnValues']['validationTx'])
+            .then(function(e){
+                landValue_Receipt.table.push({
+                    status:e.status, 
+                    transactionHash:e.transactionHash, 
+                    transactionIndex:e.transactionIndex, 
+                    blockHash:e.blockHash, 
+                    blockNumber:e.blockNumber, 
+                    contractAddress:e.contractAddress, 
+                    cumulativeGasUsed:e.cumulativeGasUsed,
+                    logs:e.logs
+                });
+                let filePath = 'relayer-server/routes/landValue_Receipt.json';
+                var jlandValue_Receipt = JSON.stringify(landValue_Receipt);
+                fs.writeFile(filePath, jlandValue_Receipt, 'utf8', function(){
+                    
+                });
+                // res.sendFile(__dirname + '/views/Done.html');
+            })
+        }
+    }
+});
+async function ResponseValidationOnEth(msgHash, v, r, s, notary, EthIndex, Action, Status){
+    // if(Action == 1){
+    //     web3.eth.personal.unlockAccount(NotaryAgent, "1234", 500)
+    //     .then(function(){
+    //         Validation.methods.verifyResponse(AssetList_Address, RequestList_Address, msgHash, v, r, s, notary, EthIndex, Action, Status).send({from: NotaryAgent, gas: 6721974})
+    //         .then(function(e){
+    //             console.log("[relayer] Validating Corda response transaction");
+    //         });
+    //     });
+    // }
+    // else if(Action == 2){
+    //     web3.eth.personal.unlockAccount(NotaryAgent, "1234", 500)
+    //     .then(function(){
+    //         Validation.methods.verifyResponse(AssetList_Address, RequestList_Address, msgHash, v, r, s, notary, EthIndex, Action, Status).send({from: NotaryAgent, gas: 6721974})
+    //         .then(function(e){
+    //             console.log("[relayer] Validating Corda response transaction");
+    //         });
+    //     });
+    // }
+    // else if(Action == 3){
+    //     web3.eth.personal.unlockAccount(NotaryAgent, "1234", 500)
+    //     .then(function(){
+    //         Validation.methods.verifyResponse(AssetList_Address, RequestList_Address, msgHash, v, r, s, notary, EthIndex, Action, Status).send({from: NotaryAgent, gas: 6721974})
+    //         .then(function(e){
+    //             console.log("[relayer] Validating Corda response transaction");
+    //         });
+    //     });
+    // }
+    web3.eth.personal.unlockAccount(NotaryAgent, "1234", 500)
+    .then(function(){
+        Validation.methods.verifyResponse(AssetList_Address, RequestList_Address, msgHash, v, r, s, notary, EthIndex, Action, Status).send({from: NotaryAgent, gas: 6721974})
+        .then(function(e){
+            console.log("[relayer] Validating Corda response transaction");
+            writeToLog("[relayer] Validating Corda response transaction")
         });
     });
-};
-
-async function FromCorda(Action, AssetOwner, NewOwner, Asset, AssetIndex, linearId, callback) {
-    if(Action == 0 || Action == 1){ // Copy & Transfer
-        if(Action == 0){
-            console.log("----------CopyFromCorda(agent,src,dst)----------");
-            console.log("agent: " + NotaryAgent);
-            console.log("src: " + AssetOwner);
-            console.log("dst: " + NewOwner);
-
-            AssetList.methods.addAsset_Health(NewOwner, Asset).send({from: NotaryAgent, gas: 6721974})
-            .then(function(receipt){
-                console.log("-------------Finish Copy from Corda--------------");
-                callback(receipt.transactionHash, linearId, Action); // Tell Corda if we're done
-            })
-        }
-        else{
-            console.log("----------TransferFromCorda(agent,src,dst)----------");
-            console.log("agent: " + NotaryAgent);
-            console.log("src: " + AssetOwner);
-            console.log("dst: " + NewOwner);
-            console.log("asset: " + Asset);
-
-            AssetList.methods.addAsset_Car(NewOwner, Asset).send({from: NotaryAgent, gas: 6721974})
-            .then(function(receipt){
-                console.log("-------------Finish Transfer from Corda--------------");
-                callback(receipt.transactionHash, linearId, Action); // Tell Corda if we're done
-            })
-        }
-    }
 }
 
-// 0:pending, 1:reject, 2:success
-async function updateStatusEth(Action, requestIndex, Status, Hash){
-    if(Action == 0){
-        RequestList.methods.changeCopyStatus(requestIndex, Status).send({from: NotaryAgent, gas: 6721974})
-        .then(function(){
-            console.log("-------------Change Ethereum Copy Request Status---------------");
-            console.log("Copy Request: " + requestIndex);
-            console.log("Status: " + Status);
-        })
-    }else if(Action == 1){
-        RequestList.methods.changeTransferStatus(requestIndex, Status).send({from: NotaryAgent, gas: 6721974})
-        .then(function(){
-            removeTransferReq(0,requestIndex);
-            console.log("-------------Change Ethereum Transfer Request Status---------------");
-            console.log("Transfer Request: " + requestIndex);
-            console.log("Status: " + Status);
-        })
-    }else if(Action == 2){
-        RequestList.methods.changeExchangeStatus(requestIndex, Status).send({from: NotaryAgent, gas: 6721974})
-        .then(function(){
-            console.log("-------------Change Ethereum Exchange Request Status---------------");
-            console.log("Exchange Request: " + requestIndex);
-            console.log("Status: " + Status);
-        })
-    }else if(Action == 3){
-        RequestList.methods.changeEncumbranceStatus(requestIndex, Status).send({from: NotaryAgent, gas: 6721974})
-        .then(function(){
-            console.log("-------------Change Encumbrance Request Status---------------");
-            console.log("Encumbrance Request: " + requestIndex);
-            console.log("Status: " + Status);
-        })
-    }
-}
-
-// Chain 0 is Eth, 1 is Corda
-async function exchangeMatching(Chain, EthAsset, CordaAsset, EthA, CordaA, EthB, CordaB, EthRequestIndex, callback){
-    console.log(Chain);
-    console.log(EthA);
-    console.log(CordaA);
-    console.log(EthB);
-    console.log(CordaB);
-    console.log(EthAsset);
-    console.log(CordaAsset);
-    let lengthBeforePush = ExchangeReqObj.length
-    if(Chain === 0){
-        if(ExchangeReqObj.length !== 0){
-            for(let i = 0; i < lengthBeforePush; i++){
-                if(ExchangeReqObj[i].Cancel === "False" && ExchangeReqObj[i].EthAsset === EthAsset && ExchangeReqObj[i].CordaAsset === CordaAsset && ExchangeReqObj[i].EthA=== EthA && ExchangeReqObj[i].CordaA === CordaA && ExchangeReqObj[i].EthB === EthB && ExchangeReqObj[i].CordaB === CordaB){
-                    ExchangeReqObj[i].Timeout = 0;
-                    ExchangeReqObj[i].EthRequestIndex = EthRequestIndex;
-                    // do exchange
-                    callback(i);
-                }
-                else if (i === lengthBeforePush - 1) {
-                    ExchangeReqObj.push({
-                        EthAsset: EthAsset,
-                        CordaAsset: CordaAsset,
-                        EthA: EthA,
-                        CordaA: CordaA,
-                        EthB: EthB,
-                        CordaB: CordaB,
-                        EthRequestIndex: EthRequestIndex,
-                        Cancel: "False",
-                        Timeout: Math.floor(Date.now() / 1000) + exchangeTimeOut // 10 seconds
-                    });
-                    console.log("eth 1 push to ExchangeReqObj")
-                }else{
-                    //Nothing to do.
-                }
-            }
-        }
-        else{
-            ExchangeReqObj.push({
-                EthAsset: EthAsset,
-                CordaAsset: CordaAsset,
-                EthA: EthA,
-                CordaA: CordaA,
-                EthB: EthB,
-                CordaB: CordaB,
-                EthRequestIndex: EthRequestIndex,
-                Cancel: "False",
-                Timeout: Math.floor(Date.now() / 1000) + exchangeTimeOut // 10 seconds
-            });
-            console.log("eth 0 push to ExchangeReqObj")
-        }
-    }
-    else{
-        // Corda...
-        if(ExchangeReqObj.length !== 0) {
-            for (let i = 0; i < lengthBeforePush; i++) {
-                // console.log("i: "+i)
-                // console.log("ExchangeReqObj.length: "+ExchangeReqObj.length)
-                if (ExchangeReqObj[i].Cancel === "False" && ExchangeReqObj[i].EthAsset === EthAsset && ExchangeReqObj[i].CordaAsset === CordaAsset && ExchangeReqObj[i].EthA=== EthA && ExchangeReqObj[i].CordaA === CordaA && ExchangeReqObj[i].EthB === EthB && ExchangeReqObj[i].CordaB === CordaB) {
-                    console.log("Obj match!")
-                    ExchangeReqObj[i].Timeout = 0;
-                    //do exchange
-                    callback(i);
-                }else if(i === lengthBeforePush - 1) {
-                    ExchangeReqObj.push({
-                        EthAsset: EthAsset,
-                        CordaAsset: CordaAsset,
-                        EthA: EthA,
-                        CordaA: CordaA,
-                        EthB: EthB,
-                        CordaB: CordaB,
-                        Cancel: "False",
-                        Timeout: Math.floor(Date.now() / 1000) + exchangeTimeOut	// 10 seconds
-                    })
-                    console.log("corda 1 push to ExchangeReqObj")
-                }
-                else{
-                    //Nothing to do.
-                }
-            }
-        }else{
-            ExchangeReqObj.push({
-                EthAsset: EthAsset,
-                CordaAsset: CordaAsset,
-                EthA: EthA,
-                CordaA: CordaA,
-                EthB: EthB,
-                CordaB: CordaB,
-                Cancel: "False",
-                Timeout: Math.floor(Date.now() / 1000) + exchangeTimeOut	// 10 seconds
-            })
-            console.log("corda 0 push to ExchangeReqObj")
-        }
-    }
-}
-
-function doExchange(i){
-    // on Eth
-    AssetList.methods.ChangeOwnerOfUSdollar(ExchangeReqObj[i].EthAsset, ExchangeReqObj[i].EthA).send({from: NotaryAgent, gas: 6721974})
-    .then(function(receipt){
-       	// done
-        console.log("Changing the US dollar owner to New Owner!")
-    });
-    //on Corda
-    let id = ExchangeReqObj[i].CordaAsset
-    console.log("----------exchangeToEthFinish(cordaId)----------")
-    console.log("cordaId: " + id)
-    braid.flows.exchangeToEthFinish(id).then(
-        result => {
-            id = result['coreTransaction']['outputs']['0']['data']['linearId']['id']
-            console.log("Success!")
-            //After Corda and Eth finish doExchange, request object will be remove.
-            ExchangeReqObj.splice(i,1)
-        }, err => {
-            console.log("err on updateStatusCorda exchange: " + err)
-        })
-}
-
-function requestCancel(){
-	for(i = 0; i < ExchangeReqObj.length; i++){
-		if(ExchangeReqObj[i].Cancel == "False" && ExchangeReqObj[i].Timeout !== 0){
-			if(ExchangeReqObj[i].Timeout <= Date.now()/1000){
-                if(ExchangeReqObj[i].EthRequestIndex != null){
-				    ExchangeReqObj[i].Cancel = "True";
-				    AssetList.methods.ChangeOwnerOfUSdollar(ExchangeReqObj[i].EthAsset, ExchangeReqObj[i].EthB).send({from: NotaryAgent, gas: 6721974})
-    			    .then(function(receipt){
-       				     // done
-                        console.log("Changing the US dollar owner to Origin Owner!");
-    			     });
-                    updateStatusEth(2, ExchangeReqObj[i].EthRequestIndex, 1, "0");
-                }
-                else{
-    			     // Corda function
-                    //on Corda
-                    let id = ExchangeReqObj[i].CordaAsset
-                    braid.flows.rollback(id).then(
-                        result => {
-                            console.log("Rollback "+ id +" Success!")
-                            //After Corda and Eth finish rollback, request object will be remove.
-                            ExchangeReqObj = ExchangeReqObj.splice(i,1)
-                        }, err => {
-                            console.log("err on corda rollback exchange: " + err)
-                        })
-                }
-			}
-		}
-	}
-
-	//Rollback transfer
-	for(let i = 0; i < TransferReqObj.length; i++){
-        if(TransferReqObj[i].Timeout <= Date.now()/1000 && TransferReqObj[i].Timeout !== 0){
-            if(TransferReqObj[i].chain === 0){
-                //Ethereum function
-                AssetList.methods.ChangeOwnerOfCar(TransferReqObj[i].asset, TransferReqObj[i].origOwner).send({from: NotaryAgent, gas: 6721974})
-            	.then(function(result){
-                	console.log("Changing the Car license owner to Origin Owner!");
-            	});
-                removeTransferReq(0,TransferReqObj[i].id)
-            }
-            else{
-                // Corda function
-                let id = TransferReqObj[i].id
-                braid.flows.rollback(id).then(
-                    result => {
-                        console.log("Rollback "+ id +" Success!")
-                        removeTransferReq(1,TransferReqObj[i].id)
-                    }, err => {
-                        console.log("err on corda rollback transfer: " + err)
-                    })
-            }
-        }
-    }
-}
-
-// Cancel the exchange request if timeout / per 8 seconds
-//setInterval(function(){requestCancel()}, 8000);
-
+// async function QueryLandValueOnEth(index){
+//     web3.eth.personal.unlockAccount(NotaryAgent, "1234", 500)
+//     .then(function(){
+//         AssetList.methods.getAssetInfo_Land(index).send({from:NotaryAgent})
+//         .then(function(e){
+//             var landValue = {
+//                 table: []
+//             };
+//             var landValue_Receipt = {
+//                 table: []
+//             };
+//             landValue.table.push({
+//                 blockHash:e.blockHash, 
+//                 blockNumber:e.blockNumber, 
+//                 from:e.from, 
+//                 gas:e.gas, 
+//                 gasPrice: e.gasPrice, 
+//                 hash:e.hash, 
+//                 input:e.input,
+//                 nonce:e.nonce, 
+//                 to:e.to, 
+//                 tansactionIndex:e.trancsactionIndex,  
+//                 value:e.value, 
+//                 v:e.v, 
+//                 r:e.r, 
+//                 s:e.s
+//             });
+//             let filePath = 'relayer-server/routes/landValue.json';
+//             var jlandValue = JSON.stringify(landValue);
+//             fs.writeFile(filePath, jlandValue, 'utf8', function(){
+//                 // console.log('Get Land Value!!!');
+//             });
+//             web3.eth.getTransactionReceipt(e.transactionHash)
+//             .then(function(e){
+//                 transferRes_Receipt.table.push({
+//                     status:e.status, 
+//                     transactionHash:e.transactionHash, 
+//                     transactionIndex:e.transactionIndex, 
+//                     blockHash:e.blockHash, 
+//                     blockNumber:e.blockNumber, 
+//                     contractAddress:e.contractAddress, 
+//                     cumulativeGasUsed:e.cumulativeGasUsed,
+//                     logs:e.logs
+//                 });
+//                 let filePath = 'relayer-server/routes/landValue_Receipt.json';
+//                 var jlandValue_Receipt = JSON.stringify(landValue_Receipt);
+//                 fs.writeFile(filePath, jlandValue_Receipt, 'utf8', function(){
+//                     // console.log('Get Land Value Receipt!!!');
+//                 });
+//             })
+//         })
+//     })
+// }
 
 
 
@@ -656,22 +975,22 @@ function onOpen() {
 function onClose() { console.log('Disconnected from node.'); }
 function onError(err) { console.error(err);}
 
-async function getPayOffByCollateralId(cId){
-    if (loanStates.length === 0){
-        return "There is no loanState in list."
-    }
-    for(let i = 0 ;i < loanStates.length; i++){
-        if (state.collateralId === cId){
-            return state.isPayOff
-        }
-        else if (i === loanStates.length - 1){
-            return "Cannot find match CollateralId."
-        }else{
-            // do nothing
-        }
-
-    }
-}
+// async function getPayOffByCollateralId(cId){
+//     if (loanStates.length === 0){
+//         return "There is no loanState in list."
+//     }
+//     for(let i = 0 ;i < loanStates.length; i++){
+//         if (state.collateralId === cId){
+//             return state.isPayOff
+//         }
+//         else if (i === loanStates.length - 1){
+//             return "Cannot find match CollateralId."
+//         }else{
+//             // do nothing
+//         }
+//
+//     }
+// }
 
 async function updateLoanStates(cordaId,collateralId,loanId,isPayOff){
     if (loanStates.length === 0){
@@ -741,18 +1060,18 @@ function removeTransferReq(chainId,assetId){
 //     }
 // }
 
-async function getIsPayOffByLoanId(loanId){
-    braid.flows.getIsPayOffByLoanId(loanId).then(
-        result =>{
-            console.log("----------getIsPayOffByLoanId("+loanId+")----------")
-            let rlt = !result
-            console.log("getIsPayOffByLoanId(loanId):"+rlt)
-        }, err => {
-            console.log("err on getIsPayOffByLoanId("+loanId+")")
-            console.log(err)
-            return "err"
-        })
-}
+// async function getIsPayOffByLoanId(loanId){
+//     braid.flows.getIsPayOffByLoanId(loanId).then(
+//         result =>{
+//             console.log("----------getIsPayOffByLoanId("+loanId+")----------")
+//             let rlt = !result
+//             console.log("getIsPayOffByLoanId(loanId):"+rlt)
+//         }, err => {
+//             console.log("err on getIsPayOffByLoanId("+loanId+")")
+//             console.log(err)
+//             return "err"
+//         })
+// }
 
 router.post('/test',(req,res)=>{
     console.log("----------test(a,b,c,d)----------")
@@ -1029,26 +1348,164 @@ router.get('/getLtx',function (req,res) {
     res.send(ltx)
 })
 
-app.post('/Corda2Relayer',function (req,res) {
-    console.log("==================================================================================")
-    console.log("C->E copy request")
+/**todo: request send from Corda will like this
+ RequestBody body = new FormBody.Builder()
+ .add("ltx",json)
+ .add("msg","0x390c230c946e713b8f41a5c02a0fa3a4c40acb9a94b15694c1694e3522b2ab77")
+ .add("v","28")
+ .add("r","0x56cf5a5257bc2b5b26e1fc99503afcd5e6d30faf5f72d9cce59bdb4f72e025f1")
+ .add("s","0x74de9cbe26c3c10d60534d97ca90c04ebfcfc62858456fdf70f7743d5dd6b78e")
+ .add("notary","0x2e988a386a799f506693793c6a5af6b54dfaabfb")
+ .add("newOwner", byte32 Ethereum address)
+ .add("asset",string)
+ .add("request","transfer")
+ .build();
+ */
+app.post('/Corda2RelayerRequest',function (req,res) {
+    console.log("[Corda]\n==================================================================================")
+    writeToLog("[Corda]\n==================================================================================")
+    let requestType = req.body.request
+    // copy 0, transfer 1, exchange 2
+    let requestTypeInt = 0
+    if (requestType === "copy"){
+        console.log("C->E copy request")
+        writeToLog("C->E copy request")
+    } else if(requestType === "transfer"){
+        console.log("C->E transfer request")
+        writeToLog("C->E transfer request")
+        requestTypeInt = 1
+    }else if (requestType === "encumbrance") {
+        console.log("C->E encumbrance request")
+        writeToLog("C->E encumbrance request")
+        requestTypeInt = 3
+    }
     ltx = req.body.ltx
     let msgHash = req.body.msg
     console.log("msgHash: "+msgHash)
+    writeToLog("msgHash: "+msgHash)
     let v = req.body.v
     let r = req.body.r
     let s = req.body.s
     console.log("Signature:[\nv: "+ v + ",\nr: "+ r + ",\ns: "+s+"\n]")
+    writeToLog("Signature:[\nv: "+ v + ",\nr: "+ r + ",\ns: "+s+"\n]")
     let notary = req.body.notary
     // let newOwner = req.body.newOwner
     let newOwner = AliceETH
-    console.log("New owner: "+newOwner)
     let asset = req.body.asset
-    console.log("Asset: "+asset)
+    let assetId = req.body.assetId
+    if (requestTypeInt !== 3){
+        console.log("New owner: AliceETH")
+        writeToLog("New owner: AliceETH")
+        console.log("Asset: "+asset)
+        writeToLog("Asset: "+asset)
+        console.log("Asset ID: "+assetId)
+        writeToLog("Asset ID: "+assetId)
+    }else{
+        console.log("Query value of land ID: "+ assetId)
+        writeToLog("Query value of land ID: "+ assetId)
+        asset = assetId
+    }
     res.send("Corda2Relayer success!")
-    ValidationOnEth(msgHash,v,r,s,notary,newOwner,asset).then(function(rlt){
+    ValidationOnEth(msgHash,v,r,s,notary,newOwner,parseInt(asset,10),requestTypeInt,assetId).then(function(rlt){
         console.log("Valid signature!")
+        writeToLog("Valid signature!")
         console.log("==================================================================================")
+        writeToLog("==================================================================================")
+    })
+})
+
+
+/**todo: response send from Corda will like this
+ * RequestBody body = new FormBody.Builder()
+ .add("ltx",json)
+ .add("msg","0x390c230c946e713b8f41a5c02a0fa3a4c40acb9a94b15694c1694e3522b2ab77")
+ .add("v","28")
+ .add("r","0x56cf5a5257bc2b5b26e1fc99503afcd5e6d30faf5f72d9cce59bdb4f72e025f1")
+ .add("s","0x74de9cbe26c3c10d60534d97ca90c04ebfcfc62858456fdf70f7743d5dd6b78e")
+ .add("notary","0x2e988a386a799f506693793c6a5af6b54dfaabfb")
+ .add("newOwner",Ethereum Account)
+ .add("asset",AssetTxHash)
+ .add("request","transfer")
+ .build();
+ */
+app.post('/Corda2RelayerResponse',function (req,res) {
+    console.log("[Corda]\n==================================================================================")
+    writeToLog("[Corda]\n==================================================================================")
+    let requestType = req.body.request
+    // transfer 1, exchange 2
+    let requestTypeInt = 1
+    if(requestType === "transfer"){
+        console.log("C->E transfer response")
+        writeToLog("C->E transfer response")
+        requestTypeInt = 1
+    }else if (requestType === "exchange") {
+        requestTypeInt = 2
+    }else if (requestType === "encumbrance") {
+        requestTypeInt = 3
+    }else{
+        //do nothing
+    }
+    ltx = req.body.ltx
+    let msgHash = req.body.msg
+    console.log("msgHash: "+msgHash)
+    writeToLog("msgHash: "+msgHash)
+    let v = req.body.v
+    let r = req.body.r
+    let s = req.body.s
+    console.log("Signature:[\nv: "+ v + ",\nr: "+ r + ",\ns: "+s+"\n]")
+    writeToLog("Signature:[\nv: "+ v + ",\nr: "+ r + ",\ns: "+s+"\n]")
+    let notary = req.body.notary
+    // let newOwner = req.body.newOwner
+    // let newOwner = AliceETH
+    let value = req.body.value
+    let assetIndex = req.body.assetIndex
+    let exchangeRltInt = 0
+    if (requestTypeInt === 1){
+        console.log("Ethereum(old) owner: AliceETH")
+        writeToLog("Ethereum(old) owner: AliceETH")
+        console.log("Corda(new) owner: BobCORDA")
+        writeToLog("Corda(new) owner: BobCORDA")
+        console.log("Eth Asset index: "+assetIndex)
+        writeToLog("Eth Asset index: "+assetIndex)
+        console.log("Eth Asset value: "+value)
+        writeToLog("Eth Asset value: "+value)
+    }
+    else if (requestTypeInt === 2) {
+        console.log("Eth Asset index: "+assetIndex)
+        writeToLog("Eth Asset index: "+assetIndex)
+        if (value === "success"){
+            console.log("This is an exchange success response to ETH.")
+            writeToLog("This is an exchange success response to ETH.")
+        }
+        else{
+            exchangeRltInt = 1 // rollback
+            console.log("This is a rollback response to ETH.")
+            writeToLog("This is a rollback response to ETH.")
+        }
+    }
+    else if(requestTypeInt === 3){
+        console.log("This is an encumbrance response to ETH: ")
+        writeToLog("This is an encumbrance response to ETH: ")
+        if (value === "true" || value === true){
+            exchangeRltInt = 0
+            console.log("Loan contract with land ID: "+ assetIndex + " is pay-off.")
+            writeToLog("Loan contract with land ID: "+ assetIndex + " is pay-off.")
+        }else{
+            exchangeRltInt = 1
+            console.log("Loan contract with land ID: "+ assetIndex + " is not pay-off")
+            writeToLog("Loan contract with land ID: "+ assetIndex + " is not pay-off")
+        }
+
+    }
+    else{
+        //do nothing
+    }
+    res.send("Corda2Relayer success!")
+
+    ResponseValidationOnEth(msgHash,v,r,s,notary,assetIndex,requestTypeInt,exchangeRltInt).then(function(rlt){
+        // console.log("Valid signature!")
+        console.log("==================================================================================")
+        writeToLog("==================================================================================")
     })
 })
 
@@ -1056,13 +1513,16 @@ async function updateEthBlocksToCorda(blocks){
     let input = blocks
     if (input === null){
         console.log("UpdateEthBlock input is empty.")
+        writeToLog("[Relayer]UpdateEthBlock input is empty.")
         return
     }
     braid.flows.UpdateEthBlock(blocks).then(
         result => {
             console.log("[Relayer] Send blocks to Corda Success! Current height: "+result)
+            writeToLog("[Relayer] Send blocks to Corda Success! Current height: "+result)
         },err => {
             console.log("[Relayer] Error on UpdateEthBlock: "+err)
+            writeToLog("[Relayer] Error on UpdateEthBlock: "+err)
         })
 }
 
@@ -1072,10 +1532,14 @@ async function updateEthBlocksToCorda(blocks){
 let blockBuffer = [],blockResolved = []
 async function freadEthBlocks(){
     let fs = require('fs')
-    let filePath = 'notary-server/routes/Blocks_Info.json';
+    let filePath = 'relayer-server/routes/Blocks_Info.json';
     let file
     fs.readFile(filePath,"utf8",function (err,data) {
         if (err){
+            if (err instanceof Error){
+                console.log("[ERR] Error on readfile: "+ err.code + "\n")
+                writeToLog("[ERR] Error on readfile: "+ err.code + "\n")
+            }
             throw err;
         }
         file = data
@@ -1131,98 +1595,335 @@ function blockHashHasResolved(hash){
 }
 
 
-// Buffer convert file to object, and avoid double read.
-// Resolved save TXs that are sended to Corda. Avoid double send.
+// Buffer convert file to object, and avoid double read. Non-poped.
+// Resolved save TXs that are sended to Corda. Avoid double send. Non-poped.
 let requestTXBuffer = [],assetTXBuffer = []
 let requestTXResolved = [],assetTXResolved = []
-async function freadEthTXs(){
-    // 1. convert file to requestTXBuffer list
-    let fs = require('fs')
-    let filePath = 'notary-server/routes/CopyRequestTxs.json';
-    let file
+let requestTXReceiptBuffer = [], assetTXReceiptBuffer = []
+let requestTXReceiptResolved = [], assetTXReceiptResolved = []
+let requestTXForAction = [] // copy 0, transfer 1, exchange 2
+let responseTXBuffer = [],responseTXReceiptBuffer = []
+let responseTXResolved = [],responseTXReceiptResolved = []
+let responseTXForAction = [] // transfer 1
+
+
+function convertJSONFileToRequestTXBufferListWithFilePath(filePath,action) {
+    fs.readFile(filePath, "utf8", function (err, data) {
+        if (err) {// no request
+            // console.log(err)
+            return
+        }
+        let file = data
+        let fixedFile = file.substring(file.indexOf("["), file.lastIndexOf("]") + 1)
+        let requests = JSON.parse(fixedFile)
+        for (let i = 0; i < requests.length; i++) {
+            // console.log("requestTX "+i+": "+requests[String(i)]['hash'])
+            if (requestTXBuffer.length === 0) {
+                requestTXBuffer.push(requests[String(i)])
+                requestTXForAction.push(action)
+            } else {
+                let length = requestTXBuffer.length
+                for (let j = 0; j < length; j++) {
+                    if (requestTXBuffer[String(j)]['hash'] === requests[String(i)]['hash']) {
+                        break
+                    }
+                    if (j === requestTXBuffer.length - 1) {
+                        requestTXBuffer.push(requests[String(i)])
+                        requestTXForAction.push(action)
+                    }
+                }
+            }
+        }
+    })
+}
+
+function convertJSONFileToAssetTXBufferListWithFilePath(filePath) {
     fs.readFile(filePath,"utf8",function (err,data) {
         if (err){// no request
             // console.log(err)
             return
         }
-        file = data
-        let fixedFile = file.substring(file.indexOf("["),file.lastIndexOf("]")+1)
-        let requests = JSON.parse(fixedFile)
-        for (let i=0;i<requests.length;i++){
-            // console.log("requestTX "+i+": "+requests[String(i)]['AssetTx'])
-            if (requestTXBuffer.length === 0){
-                requestTXBuffer.push(requests[String(i)])
+        let file = data
+        let fixedFile2 = file.substring(file.indexOf("["),file.lastIndexOf("]")+1)
+        let assets = JSON.parse(fixedFile2)
+        for (let i=0;i<assets.length;i++){
+            // console.log("assetTX "+i+": "+assets[String(i)]['hash'])
+            if (assetTXBuffer.length === 0){
+                assetTXBuffer.push(assets[String(i)])
             } else{
-                for (let j=0;j<requestTXBuffer.length;j++){
-                    if (requestTXBuffer[String(j)]['AssetTx'] === requests[String(i)]['AssetTx']){
+                let length = assetTXBuffer.length
+                for (let j=0;j<length;j++){
+                    if (assetTXBuffer[String(j)]['hash'] === assets[String(i)]['hash']){
                         break
                     }
-                    if (j === requestTXBuffer.length-1){
-                        requestTXBuffer.push(requests[String(i)])
+                    if (j === assetTXBuffer.length-1){
+                        assetTXBuffer.push(assets[String(i)])
+                    }
+                }
+            }
+
+        }
+    })
+}
+
+function convertJSONFileToRequestTXReceiptBufferListWithFilePath(filePath) {
+    fs.readFile(filePath, "utf8", function (err, data) {
+        if (err) {// no request
+            // console.log(err)
+            return
+        }
+        let file = data
+        let fixedFile = file.substring(file.indexOf("["), file.lastIndexOf("]") + 1)
+        let requests = JSON.parse(fixedFile)
+        for (let i = 0; i < requests.length; i++) {
+            if (requestTXReceiptBuffer.length === 0) {
+                requestTXReceiptBuffer.push(requests[String(i)])
+            } else {
+                let length = requestTXReceiptBuffer.length
+                for (let j = 0; j < length; j++) {
+                    if (requestTXReceiptBuffer[String(j)]['transactionHash'] === requests[String(i)]['transactionHash']) {
+                        break
+                    }
+                    if (j === requestTXReceiptBuffer.length - 1) {
+                        requestTXReceiptBuffer.push(requests[String(i)])
                     }
                 }
             }
         }
-// 2. convert file to assetTXBuffer list
-        filePath = 'notary-server/routes/Health_Certificate.json';
-        let file2
-        fs.readFile(filePath,"utf8",function (err,data) {
-            if (err){// no request
-                // console.log(err)
-                return
-            }
-            file2 = data
-            let fixedFile2 = file2.substring(file2.indexOf("["),file2.lastIndexOf("]")+1)
-            let assets = JSON.parse(fixedFile2)
-            for (let i=0;i<assets.length;i++){
-                // console.log("assetTX "+i+": "+assets[String(i)]['hash'])
-                if (assetTXBuffer.length === 0){
-                    assetTXBuffer.push(assets[String(i)])
-                } else{
-                    for (let j=0;j<assetTXBuffer.length;j++){
-                        if (assetTXBuffer[String(j)]['hash'] === assets[String(i)]['hash']){
-                            break
-                        }
-                        if (j === assetTXBuffer.length-1){
-                            assetTXBuffer.push(assets[String(i)])
-                        }
-                    }
-                }
-
-            }
-
-
-//3. if requestTX has not sended, send to Corda
-            for (let i=0;i<requestTXBuffer.length;i++){
-                if (requestTXHashHasResolved(requestTXBuffer[String(i)]['hash'])){
-                    break
-                }
-                for (let j=0;j<assetTXBuffer.length;j++){
-                    // console.log("1072line: "+requestTXBuffer[String(i)]['AssetTx'])
-                    // console.log("1073line: "+assetTXBuffer[String(j)]['hash'])
-
-                    if ((requestTXBuffer[String(i)]['AssetTx'] === assetTXBuffer[String(j)]['hash']) && blockNumber - CANONICAL_CHAIN_LENGTH > requestTXBuffer[String(i)]['blockNumber']) {
-                        console.log("[Relayer] Send copy request ["+requestTXBuffer[String(i)]['hash']+"] to Corda.")
-                        let fixedFile = JSON.stringify(requestTXBuffer[String(i)])
-                        // console.log("1076line: "+fixedFile)
-                        let fixedFile2 = JSON.stringify(assetTXBuffer[String(j)])
-                        // console.log("1078line: "+fixedFile2)
-                        requestTXResolved.push(requestTXBuffer[String(i)])
-                        assetTXResolved.push(assetTXBuffer[String(j)])
-                        updateEthTXToCorda(fixedFile,fixedFile2).then(rlt=>{})
-                    }
-
-                }
-            }
-        })
     })
+}
+
+function convertJSONFileToAssetTXReceiptBufferListWithFilePath(filePath) {
+    fs.readFile(filePath,"utf8",function (err,data) {
+        if (err){// no request
+            // console.log(err)
+            return
+        }
+        let file = data
+        let fixedFile2 = file.substring(file.indexOf("["),file.lastIndexOf("]")+1)
+        let assets = JSON.parse(fixedFile2)
+        for (let i=0;i<assets.length;i++){
+            // console.log("assetTX "+i+": "+assets[String(i)]['hash'])
+            if (assetTXReceiptBuffer.length === 0){
+                assetTXReceiptBuffer.push(assets[String(i)])
+            } else{
+                let length = assetTXReceiptBuffer.length
+                for (let j=0;j<length;j++){
+                    if (assetTXReceiptBuffer[String(j)]['transactionHash'] === assets[String(i)]['transactionHash']){
+                        break
+                    }
+                    if (j === assetTXReceiptBuffer.length-1){
+                        assetTXReceiptBuffer.push(assets[String(i)])
+                    }
+                }
+            }
+        }
+    })
+}
+
+function convertJSONFileToResponseTXBufferListWithFilePath(filePath,action) {
+    fs.readFile(filePath,"utf8",function (err,data) {
+        if (err){// no request
+            // console.log(err)
+            return
+        }
+        let file = data
+        let fixedFile2 = file.substring(file.indexOf("["),file.lastIndexOf("]")+1)
+        let assets = JSON.parse(fixedFile2)
+        for (let i=0;i<assets.length;i++){
+            // console.log("assetTX "+i+": "+assets[String(i)]['hash'])
+            if (responseTXBuffer.length === 0){
+                responseTXBuffer.push(assets[String(i)])
+                responseTXForAction.push(action)
+            } else{
+                let length = responseTXBuffer.length
+                for (let j=0;j<length;j++){
+                    if (responseTXBuffer[String(j)]['hash'] === assets[String(i)]['hash']){
+                        break
+                    }
+                    if (j === responseTXBuffer.length-1){
+                        responseTXBuffer.push(assets[String(i)])
+                        responseTXForAction.push(action)
+                    }
+                }
+            }
+
+        }
+    })
+}
+
+function convertJSONFileToResponseTXReceiptBufferListWithFilePath(filePath) {
+    fs.readFile(filePath,"utf8",function (err,data) {
+        if (err){// no request
+            // console.log(err)
+            return
+        }
+        let file = data
+        let fixedFile2 = file.substring(file.indexOf("["),file.lastIndexOf("]")+1)
+        let assets = JSON.parse(fixedFile2)
+        for (let i=0;i<assets.length;i++){
+            if (responseTXReceiptBuffer.length === 0){
+                responseTXReceiptBuffer.push(assets[String(i)])
+            } else{
+                // console.log("assetTX "+i+": "+assets[String(i)]['transactionHash'])
+                let length = responseTXReceiptBuffer.length
+                for (let j=0;j<length;j++){
+                    if (responseTXReceiptBuffer[String(j)]['transactionHash'] === assets[String(i)]['transactionHash']){
+                        break
+                    }
+                    if (j === responseTXReceiptBuffer.length-1){
+                        responseTXReceiptBuffer.push(assets[String(i)])
+                    }
+                }
+            }
+        }
+    })
+}
+
+//FilerRead Ethereum request and response.
+async function freadEthTXs(){
+    // 1. convert file to requestTXBuffer list
+    let filePath = 'relayer-server/routes/CopyRequestTxs.json'
+    convertJSONFileToRequestTXBufferListWithFilePath(filePath,0)
+
+    filePath = 'relayer-server/routes/TransferRequestTxs.json'
+    convertJSONFileToRequestTXBufferListWithFilePath(filePath,1)
+
+    filePath = 'relayer-server/routes/ExchangeRequestTxs.json'
+    convertJSONFileToRequestTXBufferListWithFilePath(filePath,2)
+
+
+
+    // 2. convert file to assetTXBuffer list
+    filePath = 'relayer-server/routes/Health_Certificate.json'
+    convertJSONFileToAssetTXBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/Car_Certificate.json'
+    convertJSONFileToAssetTXBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/US_Certificate.json'
+    convertJSONFileToAssetTXBufferListWithFilePath(filePath)
+
+
+    // 3. convert file to requestTXReceiptBuffer list
+    filePath = 'relayer-server/routes/CopyReceipt.json'
+    convertJSONFileToRequestTXReceiptBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/TransferReceipt.json'
+    convertJSONFileToRequestTXReceiptBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/ExchangeReceipt.json'
+    convertJSONFileToRequestTXReceiptBufferListWithFilePath(filePath)
+
+
+    // 4. convert file to assetTXReceiptBuffer list
+    filePath = 'relayer-server/routes/Health_Receipt.json'
+    convertJSONFileToAssetTXReceiptBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/Car_Receipt.json'
+    convertJSONFileToAssetTXReceiptBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/US_Receipt.json'
+    convertJSONFileToAssetTXReceiptBufferListWithFilePath(filePath)
+
+
+    // 5. convert file to response list
+    filePath = 'relayer-server/routes/transferRes.json'
+    convertJSONFileToResponseTXBufferListWithFilePath(filePath,1)
+
+    filePath = 'relayer-server/routes/transferRes_Receipt.json'
+    convertJSONFileToResponseTXReceiptBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/asking_Certificate.json'
+    convertJSONFileToResponseTXBufferListWithFilePath(filePath,3)
+
+    filePath = 'relayer-server/routes/asking_Receipt.json'
+    convertJSONFileToResponseTXReceiptBufferListWithFilePath(filePath)
+
+    filePath = 'relayer-server/routes/landValue.json'
+    convertJSONFileToResponseTXBufferListWithFilePath(filePath,2)
+
+    filePath = 'relayer-server/routes/landValue_Receipt.json'
+    convertJSONFileToResponseTXReceiptBufferListWithFilePath(filePath)
+
+
+
+
+    // console.log("[DEBUG] requestTXReceiptBuffer length: "+ requestTXReceiptBuffer.length)
+    // console.log("[DEBUG] assetTXBuffer length: "+ assetTXBuffer.length)
+    // console.log("[DEBUG] assetTXReceiptBuffer length: "+ assetTXReceiptBuffer.length)
+
+    //6. if requestTX has not sended, send to Corda
+    for (let i=0;i<requestTXBuffer.length;i++){
+        // console.log("[DEBUG] i: "+ i)
+        // console.log("[DEBUG] requestTXBuffer: "+requestTXBuffer[String(i)]['hash'])
+        // console.log("[DEBUG] requestTXResolved:" + requestTXHashHasResolved(requestTXBuffer[String(i)]['hash']))
+        if (!requestTXHashHasResolved(requestTXBuffer[String(i)]['hash'])){
+            for (let j=0;j<assetTXBuffer.length;j++){
+                if (requestTXBuffer[String(i)]['AssetTx'] === assetTXBuffer[String(j)]['hash']) {
+                    // console.log("[DEBUG] 1")
+                    for (let k=0;k<requestTXReceiptBuffer.length;k++){
+                        if (requestTXBuffer[String(i)]['hash'] === requestTXReceiptBuffer[String(k)]['transactionHash']){
+                            // console.log("[DEBUG] 2")
+                            for (let l=0;l<assetTXReceiptBuffer.length;l++){
+                                // console.log("[DEBUG] L: "+requestTXBuffer[String(i)]['AssetTx'])
+                                // console.log("[DEBUG] R: "+assetTXReceiptBuffer[String(l)]['transactionHash'])
+                                if(requestTXBuffer[String(i)]['AssetTx'] === assetTXReceiptBuffer[String(l)]['transactionHash']){
+                                    //console.log("[DEBUG] request ["+requestTXBuffer[String(i)]['hash']+"] that send to Corda match !!")
+                                    if (blockNumber - CANONICAL_CHAIN_LENGTH > requestTXBuffer[String(i)]['blockNumber']){
+                                        console.log("[Relayer] Send request ["+requestTXBuffer[String(i)]['hash']+"] to Corda.")
+                                        let fixedFile = JSON.stringify(requestTXBuffer[String(i)])
+                                        let fixedFile2 = JSON.stringify(assetTXBuffer[String(j)])
+                                        let fixedFile3 = JSON.stringify(requestTXReceiptBuffer[String(k)])
+                                        let fixedFile4 = JSON.stringify(assetTXReceiptBuffer[String(l)])
+                                        requestTXResolved.push(requestTXBuffer[String(i)]['hash'])
+                                        //assetTXResolved.push(assetTXBuffer[String(j)])
+                                        //requestTXReceiptResolved.push(requestTXReceiptBuffer[String(k)])
+                                        //assetTXReceiptResolved.push(assetTXReceiptBuffer[String(l)])
+                                        let action = requestTXForAction[i]
+                                        updateEthTXToCorda(fixedFile,fixedFile2,fixedFile3,fixedFile4,action).then(rlt=>{})
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+//7. if responseTX has not sended, send to Corda
+//     for (let z = 0;z<responseTXBuffer.length;z++){
+//         console.log("[DEBUG] TX "+z+": "+responseTXBuffer[String(z)]['hash'])
+//     }
+//     for (let z = 0;z<responseTXReceiptBuffer.length;z++){
+//         console.log("[DEBUG] RE "+z+": "+responseTXBuffer[String(z)]['hash'])
+//     }
+    for (let i=0;i<responseTXBuffer.length;i++){
+        if (!responseTXHashHasResolved(responseTXBuffer[String(i)]['hash'])){
+            for (let j=0;j<responseTXReceiptBuffer.length;j++){
+                if (responseTXBuffer[String(i)]['hash'] === responseTXReceiptBuffer[String(j)]['transactionHash']) {
+                    if (blockNumber - CANONICAL_CHAIN_LENGTH > responseTXBuffer[String(i)]['blockNumber']){
+                        console.log("[Relayer] Send response ["+responseTXBuffer[String(i)]['hash']+"] to Corda.")
+                        let fixedFile = JSON.stringify(responseTXBuffer[String(i)])
+                        let fixedFile2 = JSON.stringify(responseTXReceiptBuffer[String(j)])
+                        responseTXResolved.push(responseTXBuffer[String(i)]['hash'])
+                        //responseTXReceiptResolved.push(responseTXReceiptBuffer[String(j)])
+                        let action = responseTXForAction[i]
+                        updateEthTXToCorda(fixedFile,null,fixedFile2,null,action).then(rlt=>{})
+                    }
+                }
+            }
+        }
+    }
 }
 
 
 // check requestTX in requestTXResolved
 function requestTXHashHasResolved(hash){
     for (let k=0;k<requestTXResolved.length;k++){
-        if (hash === requestTXResolved[String(k)]['hash']){
+        if (hash === requestTXResolved[String(k)]){
             // console.log("request has sended.")
             return true
         }
@@ -1233,23 +1934,58 @@ function requestTXHashHasResolved(hash){
     return false
 }
 
-async function updateEthTXToCorda(requestTx,assetTx){
+// check responseTX in requestTXResolved
+function responseTXHashHasResolved(hash){
+    for (let k=0;k<responseTXResolved.length;k++){
+        if (hash === responseTXResolved[String(k)]){
+            // console.log("response has sended.")
+            return true
+        }
+        if (k===responseTXResolved.length-1){
+            return false
+        }
+    }
+    return false
+}
+
+async function updateEthTXToCorda(requestTx,assetTx,requestTXReceipt,assetTXReceipt,action){
     let input = requestTx
     let input2 = assetTx
-
-    if (input === null || input2 === null){
+    let input3 = requestTXReceipt
+    let input4 = assetTXReceipt
+    let input5 = action
+    if (input === null || input3 === null || input5 < 0){
         return "UpdateEthTX inputs is empty."
     }
-    braid.flows.UpdateEthTX(input,input2,false).then(
+    braid.flows.UpdateEthTX(input,input2,input3,input4,input5).then(
         result => {
             console.log("[Corda]"+result)
+            writeToLog("[Corda]"+result)
         },err => {
             console.log("[Relayer] Error on UpdateEthTX: "+err)
+            writeToLog("[Relayer] Error on UpdateEthTX: "+err)
         })
 }
 
 setInterval(freadEthBlocks,2000)
 setInterval(freadEthTXs,2000)
 
+
+app.post('/time', (req, res) => {
+    console.log("[Timer] Notify Corda time: "+req.body.time)
+    res.send("ok")
+    braid.flows.checkTime(parseInt(req.body.time)).then(
+        result => {
+            // console.log(result)
+            // let rlt = result
+            // if (rlt.length === 0){
+            //     rlt = "No change in Corda."
+            // }
+            // res.send(rlt)
+        },err => {
+            // res.status(500)
+            // res.send(rlt)
+        })
+});
 
 module.exports = router;

@@ -394,6 +394,19 @@ public class HelloController {
     //============================================
     //======== start of contract function ========
     //============================================
+    public void writeToLog(String data){
+    //https://stackoverflow.com/questions/1625234/how-to-append-text-to-an-existing-file-in-java
+        try(FileWriter fw = new FileWriter("relayer-server/routes/log.txt", true);
+            BufferedWriter bw = new BufferedWriter(fw);
+            PrintWriter out = new PrintWriter(bw))
+        {
+            out.println(data + "\n");
+
+        } catch (IOException e) {
+            //exception handling left as an exercise for the reader
+        }
+    }
+
 
     String healthTx = "";
     //將 request 存到 eth smartcontract
@@ -418,15 +431,17 @@ public class HelloController {
         if(Eth != null && Corda != null){
             log.info("Eth&Corda null");
             String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
-            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger(AssetIndex) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
                 TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigInteger.valueOf(0) ).send();
                 log.info("[user] AliceETH send a copy request"); // Dev 幹嘛多一個 + 串聯
+                writeToLog("[user] AliceETH" + " send a copy request");
 
                 TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx.getBytes(), transactionReceipt.getTransactionHash().getBytes() ).send();
                 log.info("[user] send 2 Transactions receipt for Copy");
-                
+                writeToLog("[relayer] send 2 Transactions receipt for Copy");
+
                 return "Done.html";
             }
         }
@@ -435,7 +450,13 @@ public class HelloController {
         return "true";
     }
 
-    void listenEvent(){
+    boolean onlyTriggerOnce = false;
+    void RequestListCopyEvent(){
+        if(onlyTriggerOnce == false){
+            onlyTriggerOnce = true;
+        }else{
+            return;
+        }
     //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
     //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
     //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
@@ -447,13 +468,56 @@ public class HelloController {
         filter.addSingleTopic(encodedEventSignature);
         log.info("subscribing to event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
-            log.info("event string= " + eventString.toString());
-            log.info(eventString.getTransactionHash());
+            log.info("[relayer] get copy event");
+            //log.info("event string= " + eventString.toString());
+            //log.info(eventString.getTransactionHash());
             
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( eventString.getTransactionHash() ).send();
-            
+            //拿到 return 的 parameters
+            //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
+            List<Type> results = FunctionReturnDecoder.decode(
+                log.getData(), RequestListContract.COPY_EVENT_EVENT.getParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+
+            //https://github.com/web3j/web3j/tree/master/core/src/main/java/org/web3j/protocol/core/methods/response (一些 eth 功能) 
+            //https://github.com/web3j/web3j/search?q=ethGetTransactionByHash&unscoped_q=ethGetTransactionByHash
+            //https://github.com/web3j/web3j/blob/6160282a5912ba1f35394312e6e783e040da4af3/core/src/main/java/org/web3j/protocol/core/JsonRpc2_0Web3j.java  (所有功能 all eth function )
+
+            // 合約 Event 格式: event copy_event(bytes32 assetTx, bytes32 requestTx);
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
                 log.info(transactionReceipt.getResult().toString());
+                //https://stackabuse.com/reading-and-writing-json-in-java/
+                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
+                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
+
+                //java 輸出 json 格式
+                ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), user);
+
+                let filePath = 'relayer-server/routes/Health_Certificate.json';
+                var Health = JSON.stringify(Health_Certificate);
+                fs.writeFile(filePath, Health, 'utf8', function(){
+                    // console.log('New Health Asset!!!');
+                });
+
+            } else {
+                // try again
+            }
+
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1) ).send();
+            if (transactionReceipt.getTransactionReceipt().isPresent()) {
+                log.info(transactionReceipt.getResult().toString());
+                //https://stackabuse.com/reading-and-writing-json-in-java/
+                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
+                //java 輸出 json 格式
+                ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), user);
+
+                let filePath = 'relayer-server/routes/Health_Certificate.json';
+                var Health = JSON.stringify(Health_Certificate);
+                fs.writeFile(filePath, Health, 'utf8', function(){
+                    // console.log('New Health Asset!!!');
+                });
+
             } else {
                 // try again
             }
