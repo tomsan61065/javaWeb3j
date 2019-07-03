@@ -18,6 +18,11 @@ import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+//jackson
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+
+
 //web3j
 import org.web3j.crypto.Credentials;
 import org.web3j.tx.Transfer;
@@ -279,7 +284,7 @@ public class HelloController {
 
     }
 
-    String ganacheAddress = "0x7f9473ade6f1721356c95ca652333e15eafbda32"; //每次重開 ganache 都要改成上面存在的 address
+    String ganacheAddress = "0x04ee2fedde0620bd3f8d2f77af9af9cc7fc81ff6"; //每次重開 ganache 都要改成上面存在的 address
     @RequestMapping("/deploy")
     @ResponseBody
     public String deployContract() throws Exception{
@@ -308,7 +313,7 @@ public class HelloController {
         return "true";
     }
 
-    String contractAddress = "0x4ca30e5255c0eaec4caa0cd582c1ed667e2f3a04"; //要手動更新 deploy 後的 contract address
+    String contractAddress = "0xd4e4513442b74e09e98c2f6738967fa021b80444"; //要手動更新 deploy 後的 contract address
     @RequestMapping("/listenEvent")
     @ResponseBody
     public String testlistenEvent() throws Exception{
@@ -332,6 +337,27 @@ public class HelloController {
             log.info("event string= " + eventString.toString());
             log.info(eventString.getTransactionHash());
             log.info(eventString.getData());
+
+            List<Type> results = FunctionReturnDecoder.decode(
+                    eventString.getData(), Greeter.MODIFIED_EVENT.getParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+            log.info("[relayer] get copy event");
+            log.info(results.toString());
+
+
+            EthTransaction transaction = web3j.ethGetTransactionByHash( eventString.getTransactionHash() ).send();
+            if(transaction.hasError() == false){
+                log.info(transaction.toString());
+                log.info(transaction.getTransaction().toString());
+                log.info(transaction.getResult().toString());
+                //https://stackabuse.com/reading-and-writing-json-in-java/
+                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
+                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
+
+                //java 輸出 json 格式
+                ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.writeValue(new File("../Health_Certificate.json"), transaction.getResult());
+            }
+
 
             //https://github.com/web3j/web3j/blob/9ac2c051ad9fcb54c57b5ebf3431952bf2f64884/core/src/main/java/org/web3j/protocol/core/methods/response/EthGetTransactionReceipt.java
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( eventString.getTransactionHash() ).send();
@@ -431,7 +457,7 @@ public class HelloController {
         if(Eth != null && Corda != null){
             log.info("Eth&Corda null");
             String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
-            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger(AssetIndex) ).send();
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", new BigInteger(AssetIndex) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
                 TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigInteger.valueOf(0) ).send();
@@ -468,21 +494,44 @@ public class HelloController {
         filter.addSingleTopic(encodedEventSignature);
         log.info("subscribing to event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
-            log.info("[relayer] get copy event");
             //log.info("event string= " + eventString.toString());
             //log.info(eventString.getTransactionHash());
             
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
             List<Type> results = FunctionReturnDecoder.decode(
-                log.getData(), RequestListContract.COPY_EVENT_EVENT.getParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+                eventString.getData(), RequestListContract.COPY_EVENT_EVENT.getParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+            log.info("[relayer] get copy event");
 
             //https://github.com/web3j/web3j/tree/master/core/src/main/java/org/web3j/protocol/core/methods/response (一些 eth 功能) 
             //https://github.com/web3j/web3j/search?q=ethGetTransactionByHash&unscoped_q=ethGetTransactionByHash
             //https://github.com/web3j/web3j/blob/6160282a5912ba1f35394312e6e783e040da4af3/core/src/main/java/org/web3j/protocol/core/JsonRpc2_0Web3j.java  (所有功能 all eth function )
 
             // 合約 Event 格式: event copy_event(bytes32 assetTx, bytes32 requestTx);
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0) ).send();
+            EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+            if(transaction.hasError() == false){
+                log.info(transaction.toString());
+                log.info(transaction.getTransaction().toString());
+                log.info(transaction.getResult().toString());
+                //https://stackabuse.com/reading-and-writing-json-in-java/
+                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
+                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
+
+                //java 輸出 json 格式
+                ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), transaction.getResult());
+
+                /*
+                let filePath = 'relayer-server/routes/Health_Certificate.json';
+                var Health = JSON.stringify(Health_Certificate);
+                fs.writeFile(filePath, Health, 'utf8', function(){
+                    // console.log('New Health Asset!!!');
+                });*/
+
+            }
+
+
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
                 log.info(transactionReceipt.getResult().toString());
                 //https://stackabuse.com/reading-and-writing-json-in-java/
@@ -491,32 +540,27 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), user);
+                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), transactionReceipt.getResult());
 
+                /*
                 let filePath = 'relayer-server/routes/Health_Certificate.json';
                 var Health = JSON.stringify(Health_Certificate);
                 fs.writeFile(filePath, Health, 'utf8', function(){
                     // console.log('New Health Asset!!!');
-                });
+                });*/
 
             } else {
                 // try again
             }
 
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1) ).send();
+            transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
                 log.info(transactionReceipt.getResult().toString());
                 //https://stackabuse.com/reading-and-writing-json-in-java/
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), user);
-
-                let filePath = 'relayer-server/routes/Health_Certificate.json';
-                var Health = JSON.stringify(Health_Certificate);
-                fs.writeFile(filePath, Health, 'utf8', function(){
-                    // console.log('New Health Asset!!!');
-                });
+                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), transactionReceipt.getResult());
 
             } else {
                 // try again
@@ -539,7 +583,7 @@ public class HelloController {
     
     @PostMapping("/transfer")
     @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
-    public String copy(String Eth, String Corda, String AssetIndex) throws Exception{//自動 mapping 變數名稱
+    public String transfer(String Eth, String Corda, String AssetIndex) throws Exception{//自動 mapping 變數名稱
         
         log.info("ETH:" + Eth + ", Corda:" + Corda + ", AssetIndex:" + AssetIndex);
         //log.info(_copy.Eth + " " + _copy.Corda);
@@ -552,9 +596,9 @@ public class HelloController {
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(NotaryAgent, "????", BigInteger.valueOf(500) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
-                TransactionReceipt transactionReceipt = RequestListContract.addTransferRequest(AssetList_Address, notary, Corda, BigInteger.valueOf(AssetIndex) ).send();
+                TransactionReceipt transactionReceipt = RequestListContract.addTransferRequest(AssetList_Address, notary, Corda, new BigInteger(AssetIndex) ).send();
                 log.info("-----------------Add Transfer Request-------------------"); 
-                log.info("Ethereum Account: AliceETH")
+                log.info("Ethereum Account: AliceETH");
                 log.info("Corda Account: BobCORDA");
                 
                 return "Done.html";
