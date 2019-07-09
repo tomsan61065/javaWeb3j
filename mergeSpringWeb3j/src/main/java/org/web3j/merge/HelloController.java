@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 
 //web3j
 import org.web3j.crypto.Credentials;
+import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.tx.Transfer;
 import org.web3j.tx.gas.ContractGasProvider;
 import org.web3j.tx.gas.DefaultGasProvider;
@@ -35,6 +36,7 @@ import org.web3j.utils.Numeric;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.EventEncoder;
+import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Event;
 import org.web3j.abi.datatypes.Function;
@@ -51,7 +53,6 @@ import org.web3j.protocol.http.HttpService;
 import org.web3j.protocol.admin.*;
 import org.web3j.protocol.admin.methods.response.PersonalUnlockAccount;
 import org.web3j.protocol.core.DefaultBlockParameterName;
-import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.request.*;
 import org.web3j.protocol.core.methods.response.*;
@@ -284,7 +285,7 @@ public class HelloController {
 
     }
 
-    String ganacheAddress = "0x04ee2fedde0620bd3f8d2f77af9af9cc7fc81ff6"; //每次重開 ganache 都要改成上面存在的 address
+    String ganacheAddress = "0xcdc95282c1d08442eca0ef04d2477d34416e411d"; //每次重開 ganache 都要改成上面存在的 address
     @RequestMapping("/deploy")
     @ResponseBody
     public String deployContract() throws Exception{
@@ -313,22 +314,24 @@ public class HelloController {
         return "true";
     }
 
-    String contractAddress = "0xd4e4513442b74e09e98c2f6738967fa021b80444"; //要手動更新 deploy 後的 contract address
+    String contractAddress = "0x8972a0fc0ccdc7c202b2906031b86124a1e3f2b2"; //要手動更新 deploy 後的 contract address
     @RequestMapping("/listenEvent")
     @ResponseBody
     public String testlistenEvent() throws Exception{
-        webSocketService.connect(); //這樣才會連接上 enode
+        
         testListenEvent();
         return "true";
     }
 
-    void testListenEvent(){
+    void testListenEvent() throws Exception{
+        webSocketService.connect(); //這樣才會連接上 enode
+        
         //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
         //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
         //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
         //別人範例 https://blog.csdn.net/liuzhijun301/article/details/80240437
         //範例與問題 https://ethereum.stackexchange.com/questions/51958/subscribing-to-event-using-web3j
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, contractAddress.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, contractAddress.substring(2));
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(Greeter.MODIFIED_EVENT);
         filter.addSingleTopic(encodedEventSignature);
@@ -338,10 +341,20 @@ public class HelloController {
             log.info(eventString.getTransactionHash());
             log.info(eventString.getData());
 
+
+            // To-Notice: toString 無法同時顯示 indexed 與 non-indexed 的參數，看範例可能是 type 不同的關係
             List<Type> results = FunctionReturnDecoder.decode(
                     eventString.getData(), Greeter.MODIFIED_EVENT.getParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[relayer] get copy event");
             log.info(results.toString());
+
+            List<Type> results2 = FunctionReturnDecoder.decode(
+                    eventString.getData(), Greeter.MODIFIED_EVENT.getNonIndexedParameters());
+            log.info(results2.toString());
+
+            List<Type> results3 = FunctionReturnDecoder.decode(
+                    eventString.getData(), Greeter.MODIFIED_EVENT.getIndexedParameters());
+            log.info( results3.toString() );
 
 
             EthTransaction transaction = web3j.ethGetTransactionByHash( eventString.getTransactionHash() ).send();
@@ -476,6 +489,12 @@ public class HelloController {
         return "true";
     }
 
+    //Listen Request List Copy Event
+    List<Transaction> Health_Certificate = new ArrayList<>();
+    List<TransactionReceipt> Health_Receipt = new ArrayList<>();
+    List<Transaction> CopyRequestTxs = new ArrayList<>();
+    List<TransactionReceipt> CopyReceipt = new ArrayList<>();
+
     boolean onlyTriggerOnce = false;
     void RequestListCopyEvent(){
         if(onlyTriggerOnce == false){
@@ -500,7 +519,7 @@ public class HelloController {
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
             List<Type> results = FunctionReturnDecoder.decode(
-                eventString.getData(), RequestListContract.COPY_EVENT_EVENT.getParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+                eventString.getData(), RequestListContract.COPY_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[relayer] get copy event");
 
             //https://github.com/web3j/web3j/tree/master/core/src/main/java/org/web3j/protocol/core/methods/response (一些 eth 功能) 
@@ -517,9 +536,11 @@ public class HelloController {
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
+                Health_Certificate.add(transaction.getResult());
+
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), transaction.getResult());
+                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), Health_Certificate);
 
                 /*
                 let filePath = 'relayer-server/routes/Health_Certificate.json';
