@@ -71,8 +71,8 @@ contract AssetList{
     function getAssetInfo_USdollar(uint i) view public returns (address, uint){
         return(USdollar_List[i].owner, USdollar_List[i].amount);
     }
-    function getAssetInfo_Land(uint i) view public returns (address, uint){
-        return(Land_List[i].owner, Land_List[i].value);
+    function getAssetInfo_Land(uint i) view public returns (uint){
+        return(Land_List[i].value);
     }
     
     // 驗證資產擁有人
@@ -297,7 +297,9 @@ contract RequestList{
     }
     
     // Check timeout of EncumbranceRequest
-    event encumbrance_event(string info, uint LandIndex, string USIndex, uint RequestIndex, string Bank);
+    event noticeMsg(uint index);
+    event askingMsg();
+    event encumbrance_event(bytes32 Tx);
     function checkEncumbranceTimeOut(uint time) public {
         for(uint i = 0; i < _encumbrance.length; i++){
             if(_encumbrance[i].Status == 1){
@@ -308,10 +310,16 @@ contract RequestList{
                     // emit encumbrance_event("Meet the Second time!", _encumbrance[i].EthAsset_Index, _encumbrance[i].CordaAsset_Index, _encumbrance[i].RequestIndex);
                 }
                 else if(_encumbrance[i].first <= time && _encumbrance[i].second <= time && _encumbrance[i].third <= time){
-                    emit encumbrance_event("Meet the Third time!", _encumbrance[i].EthAsset_Index, _encumbrance[i].CordaAsset_Index, _encumbrance[i].RequestIndex, _encumbrance[i].Bank);
+                    emit noticeMsg(_encumbrance[i].EthAsset_Index);
                 }
             }
         }
+    }
+    function askingCordaMsg(uint index) public{
+        
+    }
+    function emitEncumbranceEvent(bytes32 Tx) public {
+        emit encumbrance_event(Tx);
     }
     
     // 改變該請求之資產狀態，並放入TxHash
@@ -330,9 +338,14 @@ contract RequestList{
     //         _exchange[i].Status = Status;
     //     }
     // }
-    function changeEncumbranceStatus(uint i, uint Status) public {
-        if(Contract_Owner == msg.sender){
-            _encumbrance[i].Status = Status;
+    function changeEncumbranceStatus(uint i) public {
+        // if(Contract_Owner == msg.sender){
+        //     _encumbrance[i].Status = Status;
+        // }
+        for(uint i = 0; i < _encumbrance.length; i++){
+            if(_encumbrance[i].EthAsset_Index == i){
+                _encumbrance[i].Status = 0;
+            }
         }
     }
     
@@ -354,6 +367,7 @@ contract TxValidation{
         Contract_Owner = msg.sender;
     }
     
+    event land(uint value);
    function verify(address AssetContractAddress, bytes32 testStringBytes, uint8 v, bytes32 r, bytes32 s, address Notary, address owner, uint asset, uint action, string memory CordaIndex) public {
        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
        bytes32 prefixedValue = keccak256(abi.encodePacked(prefix, testStringBytes));
@@ -365,6 +379,10 @@ contract TxValidation{
            else if(action == 1){
                AssetList al = AssetList(AssetContractAddress);
                al.addAsset_Car(owner, asset); 
+           }
+           else if(action == 3){
+               AssetList al = AssetList(AssetContractAddress);
+               emit land(al.getAssetInfo_Land(asset));
            }
        }
       else{
@@ -386,6 +404,15 @@ contract TxValidation{
                    ql.ChangeOwnerOfUSdollar(AssetContractAddress, EthIndex);
                }
                al.ChangeStatusOfUSdollar(EthIndex, false);
+           }
+           else if(action == 3){
+               if(status == 0){
+                   al.ChangeStatusOfLand(EthIndex, 0);
+               }
+               else{
+                   al.ChangeStatusOfLand(EthIndex, 2);
+               }
+               ql.changeEncumbranceStatus(EthIndex);
            }
        }
       else{
