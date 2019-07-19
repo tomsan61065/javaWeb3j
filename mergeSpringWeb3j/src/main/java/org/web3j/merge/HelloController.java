@@ -397,7 +397,7 @@ public class HelloController {
     @RequestMapping("/sendEvent")
     @ResponseBody
     public String sendEvent() throws Exception{
-        //webSocketService.connect(); //這樣才會連接上 enode，好像只需要(也只能) call 一次
+        webSocketService.connect(); //這樣才會連接上 enode，好像只需要(也只能) call 一次
         TransactionManager transactionManager2 = new ClientTransactionManager(web3j, ganacheAddress);//transaction manager
 
         //要用 unlock 的方式作法 https://web3j.readthedocs.io/en/latest/transactions.html#transaction-signing-via-an-ethereum-client
@@ -657,6 +657,7 @@ public class HelloController {
                 log.info("[relayer] send 2 Transactions receipt for Transfer");
                 writeToLog("[relayer] send 2 Transactions receipt for Transfer");
 
+                return "Done.html";
             }
         }
         return "Done.html";
@@ -773,6 +774,8 @@ public class HelloController {
                 TransactionReceipt transactionReceipt2 = RequestListContract.emitExchangeEvent(usTx.getBytes(), transactionReceipt.getTransactionHash().getBytes() ).send();
                 log.info("[relayer] send 2 Transactions receipt for Exchange");
                 writeToLog("[relayer] send 2 Transactions receipt for Exchange");
+
+                return "Done.html";
             }
         }
         return "Done.html";
@@ -891,11 +894,11 @@ public class HelloController {
             List<Type> results = FunctionReturnDecoder.decode(
                 eventString.getData(), RequestListContract.EXCHANGE_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[user] Alice get notice message");
-            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", new BigInteger(500) ).send();
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
-                TransactionReceipt transactionReceipt = RequestListContract.askingCordaMsg(results.get(0).toString()).send();
-                TransactionReceipt transactionReceipt2 = RequestListContract.emitEncumbranceEvent(transactionReceipt.getTransactionHash()).send();
+                TransactionReceipt transactionReceipt = RequestListContract.askingCordaMsg(new BigInteger(results.get(0).toString()) ).send();
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitEncumbranceEvent(transactionReceipt.getTransactionHash().getBytes()).send();
             }
         });
     }
@@ -974,6 +977,7 @@ public class HelloController {
                 return "Done.html";
             }
         }
+        return "Done.html";
     }
 
     @PostMapping("/Newcar")
@@ -988,6 +992,7 @@ public class HelloController {
                 return "Done.html";
             }
         }
+        return "Done.html";
     }
     
     @PostMapping("/Newus")
@@ -1002,7 +1007,9 @@ public class HelloController {
                 return "Done.html";
             }
         }
+        return "Done.html";
     }
+/*
 
     function render(filename, params, callback){
         fs.readFile(filename, 'utf8', function (err, data) {
@@ -1064,5 +1071,5 @@ public class HelloController {
             });
         });
     });
-
+*/
 }
