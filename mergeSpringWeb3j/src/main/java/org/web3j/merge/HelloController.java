@@ -9,6 +9,7 @@ import java.io.*;
 //spring boot
 //import org.springframework.web.bind.annotation.RestController;
 //import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,11 @@ import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.stream.Collectors;
+
 //jackson
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -26,6 +32,9 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 //web3j
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.core.methods.response.Transaction;
+import org.web3j.tuples.Tuple;
+import org.web3j.tuples.generated.Tuple3;
+import org.web3j.tuples.generated.Tuple4;
 import org.web3j.tx.Transfer;
 import org.web3j.tx.gas.ContractGasProvider;
 import org.web3j.tx.gas.DefaultGasProvider;
@@ -1009,67 +1018,95 @@ public class HelloController {
         }
         return "Done.html";
     }
-/*
 
-    function render(filename, params, callback){
-        fs.readFile(filename, 'utf8', function (err, data) {
-            if (err) return callback(err);
-            for (var key in params) {
-                data = data.replace('{' + key + '}', params[key]);
-            }
-            callback(null, data); // 用 callback 傳回結果
-        });
+    //https://www.baeldung.com/java-pairs
+    //AbstractMap.SimpleEntry<Integer, String> entry
+    //  = new AbstractMap.SimpleEntry<>(1, "one");
+    //Integer key = entry.getKey();
+    //String value = entry.getValue();
+    private String render(String filename, List<AbstractMap.SimpleEntry<String, String>> params) throws Exception{
+        String result;
+        InputStream resource = new ClassPathResource("static/" + filename).getInputStream();
+        try ( BufferedReader reader = new BufferedReader(
+                new InputStreamReader(resource)) ) {
+            result = reader.lines().collect(Collectors.joining("\n"));
+        }
+        for(int i = 0; i < params.size(); i++){
+            result = result.replace("{" + params.get(i).getKey() + "}", params.get(i).getValue());
+        }
+        return result;
     }
-    app.post('/health', function(req, res){
-        AssetList.methods.queryHealthAsset().call()
-        .then(function(data){
-            render(__dirname + '/views/Health.html', {
-                a : data[0],
-                b : data[1],
-                c : data[2]
-            }, function(err, data){
-                res.send(data);
-            });
-        });
-    });
-    app.post('/car', function(req, res){
-        AssetList.methods.queryCarAsset().call()
-        .then(function(data){
-            render(__dirname + '/views/Car.html', {
-                a : data[0],
-                b : data[1],
-                c : data[2],
-                d : data[3]
-            }, function(err, data){
-                res.send(data);
-            });
-        });
-    });
-    app.post('/us', function(req, res){
-        AssetList.methods.queryUSdollarAsset().call()
-        .then(function(data){
-            render(__dirname + '/views/US.html', {
-                a : data[0],
-                b : data[1],
-                c : data[2],
-                d : data[3]
-            }, function(err, data){
-                res.send(data);
-            });
-        });
-    });
-    app.post('/land', function(req, res){
-        AssetList.methods.queryLandAsset().call()
-        .then(function(data){
-            render(__dirname + '/views/Land.html', {
-                a : data[0],
-                b : data[1],
-                c : data[2],
-                d : data[3]
-            }, function(err, data){
-                res.send(data);
-            });
-        });
-    });
-*/
+
+    //https://www.baeldung.com/spring-classpath-file-access
+    //讀進檔案
+    @GetMapping("/testPage")
+    @ResponseBody
+    public String testPage() throws Exception{
+        String result;
+        InputStream resource = new ClassPathResource("static/Health.html").getInputStream();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource)) ) {
+            result = reader.lines().collect(Collectors.joining("\n"));
+        }
+
+        List<AbstractMap.SimpleEntry<String, String>> params = new ArrayList<>();
+        params.add(new AbstractMap.SimpleEntry("a", "1"));
+        params.add(new AbstractMap.SimpleEntry("b", "2"));
+        params.add(new AbstractMap.SimpleEntry("c", "3"));
+
+        for(int i = 0; i < params.size(); i++){
+            result = result.replace("{" + params.get(i).getKey() + "}", params.get(i).getValue());
+        }
+
+        return result;
+    }
+
+
+    @GetMapping("/health")
+    @ResponseBody
+    public String health() throws Exception{
+        webSocketService.connect();
+        Tuple3 data = AssetListContract.queryHealthAsset().send();
+        List<AbstractMap.SimpleEntry<String, String>> params = new ArrayList<>();
+        params.add(new AbstractMap.SimpleEntry("a", data.getValue1().toString()));
+        params.add(new AbstractMap.SimpleEntry("b", data.getValue2().toString()));
+        params.add(new AbstractMap.SimpleEntry("c", data.getValue3().toString()));
+        return render("Health.html", params);
+    }
+
+    @GetMapping("/car")
+    @ResponseBody
+    public String car() throws Exception{
+        Tuple4 data = AssetListContract.queryCarAsset().send();
+        List<AbstractMap.SimpleEntry<String, String>> params = new ArrayList<>();
+        params.add(new AbstractMap.SimpleEntry("a", data.getValue1().toString()));
+        params.add(new AbstractMap.SimpleEntry("b", data.getValue2().toString()));
+        params.add(new AbstractMap.SimpleEntry("c", data.getValue3().toString()));
+        params.add(new AbstractMap.SimpleEntry("d", data.getValue4().toString()));
+        return render("Car.html", params);
+    }
+
+    @GetMapping("/us")
+    @ResponseBody
+    public String us() throws Exception{
+        Tuple4 data = AssetListContract.queryUSdollarAsset().send();
+        List<AbstractMap.SimpleEntry<String, String>> params = new ArrayList<>();
+        params.add(new AbstractMap.SimpleEntry("a", data.getValue1().toString()));
+        params.add(new AbstractMap.SimpleEntry("b", data.getValue2().toString()));
+        params.add(new AbstractMap.SimpleEntry("c", data.getValue3().toString()));
+        params.add(new AbstractMap.SimpleEntry("d", data.getValue4().toString()));
+        return render("US.html", params);
+    }
+
+    @GetMapping("/land")
+    @ResponseBody
+    public String land() throws Exception{
+        Tuple4 data = AssetListContract.queryLandAsset().send();
+        List<AbstractMap.SimpleEntry<String, String>> params = new ArrayList<>();
+        params.add(new AbstractMap.SimpleEntry("a", data.getValue1().toString()));
+        params.add(new AbstractMap.SimpleEntry("b", data.getValue2().toString()));
+        params.add(new AbstractMap.SimpleEntry("c", data.getValue3().toString()));
+        params.add(new AbstractMap.SimpleEntry("d", data.getValue4().toString()));
+        return render("Land.html", params);
+    }
+
 }
