@@ -666,6 +666,8 @@ let TransferReqObj = [];
 // Relayer get Blocks per 1 seconds
 setInterval(getBlocksEth, 1000);
 
+//JAVA 檢查 file 存在與否
+//https://stackoverflow.com/questions/1816673/how-do-i-check-if-a-file-exists-in-java
 const blockPath = 'relayer-server/routes/BlockNumber'
 var blockNumber;
 fs.access(blockPath, fs.F_OK, (err) => {
