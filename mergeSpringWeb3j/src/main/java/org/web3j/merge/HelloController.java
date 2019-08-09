@@ -1,5 +1,6 @@
 package org.web3j.merge;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.math.BigInteger;
 import java.math.BigDecimal;
@@ -33,6 +34,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 
 
 //web3j
+import org.web3j.abi.datatypes.generated.Bytes32;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.tuples.Tuple;
@@ -115,17 +117,17 @@ import org.web3j.merge.contracts.generated.TxValidation;
 @Controller //MVC
 public class HelloController {
 
-    private static URI parseURI(String serverUrl){
+    private static URI parseURI(String serverUri){
         try{
-            return new URI(serverUrl);
+            return new URI(serverUri);
         }catch(URISyntaxException e){
             //handle exception
             return null;
         }
     }
 
-    //String ethereumUri = "ws://140.119.101.130:7576";
-    String ethereumUri = "ws://127.0.0.1:8545";
+    String ethereumUri = "ws://140.119.101.130:7576"; //130 or 70:7576
+    //String ethereumUri = "ws://127.0.0.1:8545";
 
     // websocket 寫法
     //https://web3j.readthedocs.io/en/latest/getting_started.html#publish-subscribe-pub-sub
@@ -141,33 +143,57 @@ public class HelloController {
 
     //load contract without credantials
     //https://github.com/web3j/web3j/blob/master/core/src/main/java/org/web3j/ens/EnsResolver.java 
-    private final TransactionManager transactionManager = new ClientTransactionManager(web3j, null);  // don't use empty string
+    //private final TransactionManager transactionManager = new ClientTransactionManager(web3j, null);  // don't use empty string
+    private final TransactionManager transactionManager = new ClientTransactionManager(web3j, "0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2"); //AliceETH
 
     private static final Logger log = LoggerFactory.getLogger(Application.class);
 
+    //可能有連練問題，WS會斷掉
+    boolean onlyTriggerOnce = false;
+    //避免 websocket 因為無回應就斷開 https://github.com/TooTallNate/Java-WebSocket/wiki/Lost-connection-detection 可參考
+    private void WSconnect() throws Exception{
+        if(onlyTriggerOnce == false || webSocketClient.isClosed()){
+            onlyTriggerOnce = true;
+        }else{
+            return;
+        }
+        webSocketClient.setConnectionLostTimeout(0);
+
+        webSocketService.connect();
+    }
+
+    boolean onlyListenOnce = false;
+    private void startListenEvent() throws Exception{
+        if(onlyListenOnce == false){
+            onlyListenOnce = true;
+        }else{
+            return;
+        }
+        log.info("start listen events");
+        RequestListCopyEvent();
+        RequestListTransferEvent();
+        RequestListExchangeEvent();
+        RequestListNoticeMsgEvent();
+        RequestListEncumbranceEvent();
+        ValidationEvent();
+    }
+
+
     String NotaryAgent = "0x76ac34807210d52fcbfc0412cf4da5c672214752";
 
-/*  //web3j 建構 smartcontract 的 instance:
-    YourSmartContract contract = YourSmartContract.load(
-        "0x<address>|<ensName>", <web3j>, <credentials>, GAS_PRICE, GAS_LIMIT);
+    //ContractGasProvider contractGasProvider = new DefaultGasProvider();
+    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - Smart contract deployed to address 0x8d03da762abd76143c633445bce072eb0544b0aa
+    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - assetContract address 0xe3f364b65b0e739d49c0b4fb9bfd4f309311d4aa
+    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - requestContract address 0x1ab5ec1c09c917fd4dbd104ba5fa871c9c3fcc90
+    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - txContract address 0xf742b95fdb5a1fd6361e2fa4c5b2d255484d2c01
+    String AssetList_Address = "0xe3f364b65b0e739d49c0b4fb9bfd4f309311d4aa";
+    AssetList AssetListContract = AssetList.load(AssetList_Address, web3j, transactionManager, new DefaultGasProvider());
 
-    //不用 credentials 的建構方式
-    ENS ensRegistry = ENS.load(
-        registryContract, web3j, transactionManager,
-        DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
-    */
-
-    String AssetList_Address = "0xa53b0304ed2ac49e4bf83f28da15c62328476d85";
-    AssetList AssetListContract = AssetList.load(
-        AssetList_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
-
-    String RequestList_Address = "0xcc1a47bf74df0752f8647baf3e6d1ecc3ff080ba";
-    RequestList RequestListContract = RequestList.load(
-        RequestList_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+    String RequestList_Address = "0x1ab5ec1c09c917fd4dbd104ba5fa871c9c3fcc90";
+    RequestList RequestListContract = RequestList.load(RequestList_Address, web3j, transactionManager, new DefaultGasProvider());
         
-    String Validation_Address = "0x8b61b25cbe9cb200e325db75a067d797a586b03d";
-    TxValidation ValidationContract = TxValidation.load(
-        Validation_Address, web3j, transactionManager, DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+    String Validation_Address = "0xf742b95fdb5a1fd6361e2fa4c5b2d255484d2c01";
+    TxValidation ValidationContract = TxValidation.load(Validation_Address, web3j, transactionManager, new DefaultGasProvider());
 
     public static final String AliceETH = "0xaec8ccdac55de7949bdee80d975a06e64a7ff9e2";
     public static final String BobETH = "0xbe36543da0bc51f31cd3f915088d5d704572d047";
@@ -182,7 +208,8 @@ public class HelloController {
     /* <--------------------------------------------------------------------------------------------------> */
     @RequestMapping("/")
     public String index() throws Exception{
-        
+        WSconnect();
+        startListenEvent();
         /*
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
@@ -244,6 +271,13 @@ public class HelloController {
         return "Home.html";
     }
  
+    //https://ethereum.stackexchange.com/questions/23549/convert-string-to-bytes32-in-web3j
+    public static byte[] stringToBytes32(String string) {
+        byte[] byteValue = string.getBytes();
+        byte[] byteValueLen32 = new byte[32];
+        System.arraycopy(byteValue, 0, byteValueLen32, 0, byteValue.length);
+        return byteValueLen32;
+    }
 
 
 
@@ -252,7 +286,18 @@ public class HelloController {
     //============================================
  //   @Autowired
  //   MemberAccount memberAccount;
+    /*
+    TransactionManager transactionManager = new ClientTransactionManager(web3j, null);  // don't use empty string
 
+    String AssetList_Address = "0xfe41eb5337bd127ec171b24ebed1ee88d2c641d1";
+    AssetList AssetListContract = AssetList.load(AssetList_Address, web3j, transactionManager, new DefaultGasProvider());
+
+    String RequestList_Address = "0x8ee1b13652c8695c22a7e4372cf781fa5a540b2a";
+    RequestList RequestListContract = RequestList.load(RequestList_Address, web3j, transactionManager, new DefaultGasProvider());
+
+    String Validation_Address = "0xbf9ec3840043132efdfea54eb1850297f7fc879f";
+    TxValidation ValidationContract = TxValidation.load(Validation_Address, web3j, transactionManager, new DefaultGasProvider());
+    */
 
     @RequestMapping("/memberApi/memberTest")
     public MemberAccount memberTest(){
@@ -309,7 +354,7 @@ public class HelloController {
     @RequestMapping("/deploy")
     @ResponseBody
     public String deployContract() throws Exception{
-        webSocketService.connect(); //這樣才會連接上 enode
+        //webSocketService.connect(); //這樣才會連接上 enode
         TransactionManager transactionManager2 = new ClientTransactionManager(web3j, ganacheAddress);//transaction manager
         //testListenEvent();
 
@@ -334,6 +379,80 @@ public class HelloController {
         return "true";
     }
 
+    @RequestMapping("/deploySolContract")
+    @ResponseBody
+    public String deploySolContract() throws Exception{
+        //webSocketService.connect(); //這樣才會連接上 enode
+        TransactionManager transactionManager2 = new ClientTransactionManager(web3j, AliceETH);//transaction manager
+        //testListenEvent();
+
+        PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
+        if (personalUnlockAccount.accountUnlocked()) {
+            // send a transaction
+
+            ContractGasProvider contractGasProvider = new DefaultGasProvider();
+
+            Greeter contract = Greeter.deploy(
+                    web3jAdmin,
+                    transactionManager2,
+                    contractGasProvider,
+                    "test"
+            ).send();
+
+            AssetList assetContract = AssetList.deploy(
+                    web3jAdmin,
+                    transactionManager2,
+                    new DefaultGasProvider()
+            ).send();
+
+            RequestList requestContract = RequestList.deploy(
+                    web3jAdmin,
+                    transactionManager2,
+                    new DefaultGasProvider()
+            ).send();
+
+            TxValidation txContract = TxValidation.deploy(
+                    web3jAdmin,
+                    transactionManager2,
+                    new DefaultGasProvider()
+            ).send();
+
+            String contractAddress = contract.getContractAddress();
+            log.info("Smart contract deployed to address " + contractAddress);
+            log.info("assetContract address " + assetContract.getContractAddress());
+            AssetListContract = assetContract;
+            log.info("requestContract address " + requestContract.getContractAddress());
+            RequestListContract = requestContract;
+            log.info("txContract address " + txContract.getContractAddress());
+            ValidationContract = txContract;
+
+        }
+        return "true";
+    }
+
+
+    @RequestMapping("/loadSolContract")
+    @ResponseBody
+    public String loadSolContract() throws Exception{
+        //Greeter
+        //0xc0256d1336894f406198edc31be77156458f98a7
+        //18:25:09.680 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - assetContract address 0x7217347be0b42269bd00311de5d7b54593ed87b3
+        //18:25:09.680 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - requestContract address 0xfce76bd31a0977a6c4472d8c68026708359d8644
+        //18:25:09.680 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - txContract address 0x24503a7f71ce0e1b51ce55feb648809adfb262e0
+
+        AssetList_Address = "0x7217347be0b42269bd00311de5d7b54593ed87b3";
+        AssetListContract = AssetList.load(AssetList_Address, web3j, transactionManager, new DefaultGasProvider());
+
+        RequestList_Address = "0xfce76bd31a0977a6c4472d8c68026708359d8644";
+        RequestListContract = RequestList.load(RequestList_Address, web3j, transactionManager, new DefaultGasProvider());
+
+        Validation_Address = "0x24503a7f71ce0e1b51ce55feb648809adfb262e0";
+        ValidationContract = TxValidation.load(Validation_Address, web3j, transactionManager, new DefaultGasProvider());
+
+
+        return "true";
+    }
+
     String contractAddress = "0x27fd8de1bd7b51079e7f3be5ee107eba8eb344c6"; //要手動更新 deploy 後的 contract address
     @RequestMapping("/listenEvent")
     @ResponseBody
@@ -344,7 +463,7 @@ public class HelloController {
     }
 
     void testListenEvent() throws Exception{
-        webSocketService.connect(); //這樣才會連接上 enode
+        //webSocketService.connect(); //這樣才會連接上 enode
         
         //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
         //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
@@ -411,7 +530,7 @@ public class HelloController {
     @RequestMapping("/sendEvent")
     @ResponseBody
     public String sendEvent() throws Exception{
-        webSocketService.connect(); //這樣才會連接上 enode，好像只需要(也只能) call 一次
+        //webSocketService.connect(); //這樣才會連接上 enode，好像只需要(也只能) call 一次
         TransactionManager transactionManager2 = new ClientTransactionManager(web3j, ganacheAddress);//transaction manager
 
         //要用 unlock 的方式作法 https://web3j.readthedocs.io/en/latest/transactions.html#transaction-signing-via-an-ethereum-client
@@ -469,11 +588,27 @@ public class HelloController {
         }
     }
 
+    // String to 64 length HexString (equivalent to 32 Hex lenght)
+    public static String asciiToHex(String asciiValue)
+    {
+        if(asciiValue.length() == 66){
+            asciiValue = asciiValue.substring(2);
+        }
+        char[] chars = asciiValue.toCharArray();
+        StringBuffer hex = new StringBuffer();
+        for (int i = 0; i < chars.length; i++)
+        {
+            hex.append(Integer.toHexString((int) chars[i]));
+        }
+
+        return hex.toString() + "".join("", Collections.nCopies(32 - (hex.length()/2), "00"));
+    }
+
 
     String healthTx = "";
     //將 request 存到 eth smartcontract
     @PostMapping("/copy")
-    @ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
+    //@ResponseBody //等於告訴 spring 別從 view 找 name (別找對應的 html，單純回傳字串)
     public String copy(String Eth, String Corda, String AssetIndex) throws Exception{//自動 mapping 變數名稱
         //@RequestParam 是給 url 放參數用
         
@@ -488,19 +623,28 @@ public class HelloController {
     //    log.info("Credentials loaded");
         //log.info(_copy.object);
         log.info("ETH:" + Eth + ", Corda:" + Corda + ", AssetIndex:" + AssetIndex);
-        //log.info(_copy.Eth + " " + _copy.Corda);
-        //if(_copy.Eth == null && _copy.Corda == null){
+
         if(Eth != null && Corda != null){
             log.info("Eth&Corda null");
-            String healthTx = "0x9e4a6f930d51fca5f9d8ce2df8fa79ada826457e8043612470e254e3c885c27e";
-            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", new BigInteger(AssetIndex) ).send();
+            String healthTx = "0xd92095659bb660898017825a5c6655a372fddd53d06cd4a1a8912ded17e88649"; //index2
+            log.info("healthTx: " + healthTx);
+            log.info(String.valueOf(healthTx.length()) );
+            PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(5000) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
-                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", BigInteger.valueOf(0) ).send();
-                log.info("[user] AliceETH send a copy request"); // Dev 幹嘛多一個 + 串聯
+                TransactionReceipt transactionReceipt = RequestListContract.addCopyRequest(AssetList_Address, AliceETH, "BobCORDA", new BigInteger(AssetIndex) ).send();
+                log.info("[user] AliceETH send a copy request");
                 writeToLog("[user] AliceETH" + " send a copy request");
 
-                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent(healthTx.getBytes(), transactionReceipt.getTransactionHash().getBytes() ).send();
+
+                /*
+                https://github.com/web3j/web3j/blob/7eab3d5752fb661f58df037a11677f330b8e1117/utils/src/main/java/org/web3j/utils/Numeric.java
+                吃 byte 的都不能直接 getByte 來用，要用 Numeric 轉換
+                byte[] myStringInByte = Numeric.hexStringToByteArray(healthTx);
+                log.info("myStringInByte: " + myStringInByte.length);
+                log.info("myStringInByte: " + myStringInByte);*/
+
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitCopyEvent( Numeric.hexStringToByteArray(healthTx), Numeric.hexStringToByteArray( transactionReceipt.getTransactionHash() )).send();
                 log.info("[user] send 2 Transactions receipt for Copy");
                 writeToLog("[relayer] send 2 Transactions receipt for Copy");
 
@@ -567,20 +711,13 @@ public class HelloController {
     List<withAssetTx> CopyRequestTxs = new Vector<>();
     List<TransactionReceipt> CopyReceipt = new Vector<>();
 
-    boolean onlyTriggerOnce = false;
     void RequestListCopyEvent() throws Exception{
-        if(onlyTriggerOnce == false){
-            onlyTriggerOnce = true;
-        }else{
-            return;
-        }
-        webSocketService.connect();
     //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
     //官方範例 https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
     //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
     //別人範例 https://blog.csdn.net/liuzhijun301/article/details/80240437
     //範例與問題 https://ethereum.stackexchange.com/questions/51958/subscribing-to-event-using-web3j
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.COPY_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
@@ -613,7 +750,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), Health_Certificate);
+                objectMapper.writeValue(new File("Health_Certificate.json"), Health_Certificate);
 
                 /*
                 let filePath = 'relayer-server/routes/Health_Certificate.json';
@@ -635,7 +772,7 @@ public class HelloController {
                 Health_Receipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Health_Certificate.json"), Health_Receipt);
+                objectMapper.writeValue(new File("Health_Certificate.json"), Health_Receipt);
             } else {
                 // try again
             }
@@ -653,7 +790,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/CopyRequestTxs.json"), CopyRequestTxs);
+                objectMapper.writeValue(new File("CopyRequestTxs.json"), CopyRequestTxs);
             }
 
             transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
@@ -667,7 +804,7 @@ public class HelloController {
                 CopyReceipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/CopyReceipt.json"), CopyReceipt);
+                objectMapper.writeValue(new File("CopyReceipt.json"), CopyReceipt);
             } else {
                 // try again
             }
@@ -686,7 +823,6 @@ public class HelloController {
         //log.info(_copy.Eth + " " + _copy.Corda);
         //if(_copy.Eth == null && _copy.Corda == null){
         if(Eth != null && Corda != null){
-            log.info("Eth&Corda null");
 
             //RequestList.methods.addTransferRequest(AssetList_Address, notary, req.body.Corda, req.body.AssetIndex).send({from: NotaryAgent, gas: 6721974})
 
@@ -696,7 +832,7 @@ public class HelloController {
                 log.info("[user] AliceETH" + " send a transfer request");
                 writeToLog("[user] AliceETH" + " send a transfer request");
                 
-                transactionReceipt = RequestListContract.emitTransferEvent(carTx.getBytes(), transactionReceipt.getTransactionHash().getBytes() ).send();
+                transactionReceipt = RequestListContract.emitTransferEvent(Numeric.hexStringToByteArray(carTx), Numeric.hexStringToByteArray(transactionReceipt.getTransactionHash()) ).send();
                 log.info("[relayer] send 2 Transactions receipt for Transfer");
                 writeToLog("[relayer] send 2 Transactions receipt for Transfer");
 
@@ -714,8 +850,7 @@ public class HelloController {
     List<TransactionReceipt> TransferReceipt = new Vector<>();
 
     void RequestListTransferEvent() throws Exception{
-        webSocketService.connect();
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.TRANSFER_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
@@ -748,7 +883,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Car_Certificate.json"), Car_Certificate);
+                objectMapper.writeValue(new File("Car_Certificate.json"), Car_Certificate);
             }
 
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
@@ -762,7 +897,7 @@ public class HelloController {
                 Car_Receipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/Car_Receipt.json"), Car_Receipt);
+                objectMapper.writeValue(new File("Car_Receipt.json"), Car_Receipt);
             } else {
                 // try again
             }
@@ -780,7 +915,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/TransferRequestTxs.json"), TransferRequestTxs);
+                objectMapper.writeValue(new File("TransferRequestTxs.json"), TransferRequestTxs);
             }
 
             transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
@@ -794,7 +929,7 @@ public class HelloController {
                 TransferReceipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/TransferReceipt.json"), TransferReceipt);
+                objectMapper.writeValue(new File("TransferReceipt.json"), TransferReceipt);
             } else {
                 // try again
             }
@@ -814,7 +949,7 @@ public class HelloController {
                 log.info("[user] AliceETH" + " send a exchange request");
                 writeToLog("[user] AliceETH" + " send a exchange request");
 
-                TransactionReceipt transactionReceipt2 = RequestListContract.emitExchangeEvent(usTx.getBytes(), transactionReceipt.getTransactionHash().getBytes() ).send();
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitExchangeEvent(Numeric.hexStringToByteArray(usTx) , Numeric.hexStringToByteArray(transactionReceipt.getTransactionHash()) ).send();
                 log.info("[relayer] send 2 Transactions receipt for Exchange");
                 writeToLog("[relayer] send 2 Transactions receipt for Exchange");
 
@@ -832,8 +967,7 @@ public class HelloController {
     List<TransactionReceipt> ExchangeReceipt = new Vector<>();
 
     void RequestListExchangeEvent() throws Exception{
-        webSocketService.connect();
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.EXCHANGE_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
@@ -866,7 +1000,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/US_Certificate.json"), US_Certificate);
+                objectMapper.writeValue(new File("US_Certificate.json"), US_Certificate);
             }
 
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
@@ -880,7 +1014,7 @@ public class HelloController {
                 US_Receipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/US_Receipt.json"), US_Receipt);
+                objectMapper.writeValue(new File("US_Receipt.json"), US_Receipt);
             } else {
                 // try again
             }
@@ -898,7 +1032,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/ExchangeRequestTxs.json"), ExchangeRequestTxs);
+                objectMapper.writeValue(new File("ExchangeRequestTxs.json"), ExchangeRequestTxs);
             }
 
             transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
@@ -912,7 +1046,7 @@ public class HelloController {
                 ExchangeReceipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/ExchangeReceipt.json"), ExchangeReceipt);
+                objectMapper.writeValue(new File("ExchangeReceipt.json"), ExchangeReceipt);
             } else {
                 // try again
             }
@@ -922,12 +1056,11 @@ public class HelloController {
 
 
     void RequestListNoticeMsgEvent() throws Exception{
-        webSocketService.connect();
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
-        String encodedEventSignature = EventEncoder.encode(RequestListContract.EXCHANGE_EVENT_EVENT);
+        String encodedEventSignature = EventEncoder.encode(RequestListContract.NOTICEMSG_EVENT);
         filter.addSingleTopic(encodedEventSignature);
-        log.info("subscribing to event with filter");
+        log.info("subscribing RequestListNoticeMsg event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
             //log.info("event string= " + eventString.toString());
             //log.info(eventString.getTransactionHash());
@@ -935,13 +1068,15 @@ public class HelloController {
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
             List<Type> results = FunctionReturnDecoder.decode(
-                eventString.getData(), RequestListContract.EXCHANGE_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+                eventString.getData(), RequestListContract.NOTICEMSG_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[user] Alice get notice message");
+            log.info("[debug]" + results.toString());
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
                 TransactionReceipt transactionReceipt = RequestListContract.askingCordaMsg(new BigInteger(results.get(0).toString()) ).send();
-                TransactionReceipt transactionReceipt2 = RequestListContract.emitEncumbranceEvent(transactionReceipt.getTransactionHash().getBytes()).send();
+                TransactionReceipt transactionReceipt2 = RequestListContract.emitEncumbranceEvent(Numeric.hexStringToByteArray(transactionReceipt.getTransactionHash())).send();
+                log.info("[debug] send 2 tx in RequestListNoticeMsgEvent");
             }
         });
     }
@@ -951,10 +1086,9 @@ public class HelloController {
     List<TransactionReceipt> asking_Receipt = new Vector<>();
 
     void RequestListEncumbranceEvent()throws Exception{
-        webSocketService.connect();
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
-        String encodedEventSignature = EventEncoder.encode(RequestListContract.EXCHANGE_EVENT_EVENT);
+        String encodedEventSignature = EventEncoder.encode(RequestListContract.ENCUMBRANCE_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
         log.info("subscribing to event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
@@ -964,7 +1098,7 @@ public class HelloController {
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
             List<Type> results = FunctionReturnDecoder.decode(
-                eventString.getData(), RequestListContract.EXCHANGE_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
+                eventString.getData(), RequestListContract.ENCUMBRANCE_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[relayer] get Alice notice event");
             writeToLog("[relayer] get Alice notice event");
             EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
@@ -980,7 +1114,7 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/asking_Certificate.json"), asking_Certificate);
+                objectMapper.writeValue(new File("asking_Certificate.json"), asking_Certificate);
             }
 
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
@@ -994,7 +1128,7 @@ public class HelloController {
                 asking_Receipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("relayer-server/routes/asking_Receipt.json"), asking_Receipt);
+                objectMapper.writeValue(new File("asking_Receipt.json"), asking_Receipt);
             } else {
                 // try again
             }
@@ -1004,7 +1138,7 @@ public class HelloController {
 
     @PostMapping("/newAsset")
     public String newAsset() throws Exception{
-        return "/views/NewAsset.html";
+        return "NewAsset.html";
     }
 
 
@@ -1020,7 +1154,7 @@ public class HelloController {
                 return "Done.html";
             }
         }
-        return "Done.html";
+        return "Error.html";
     }
 
     @PostMapping("/Newcar")
@@ -1035,7 +1169,7 @@ public class HelloController {
                 return "Done.html";
             }
         }
-        return "Done.html";
+        return "Error.html";
     }
     
     @PostMapping("/Newus")
@@ -1050,7 +1184,7 @@ public class HelloController {
                 return "Done.html";
             }
         }
-        return "Done.html";
+        return "Error.html";
     }
 
     //https://www.baeldung.com/java-pairs
@@ -1095,19 +1229,20 @@ public class HelloController {
     }
 
 
-    @GetMapping("/health")
+    @PostMapping("/health")
     @ResponseBody
     public String health() throws Exception{
-        webSocketService.connect();
         Tuple3 data = AssetListContract.queryHealthAsset().send();
         List<AbstractMap.SimpleEntry<String, String>> params = new Vector<>();
+
         params.add(new AbstractMap.SimpleEntry("a", data.getValue1().toString()));
         params.add(new AbstractMap.SimpleEntry("b", data.getValue2().toString()));
         params.add(new AbstractMap.SimpleEntry("c", data.getValue3().toString()));
+
         return render("Health.html", params);
     }
 
-    @GetMapping("/car")
+    @PostMapping("/car")
     @ResponseBody
     public String car() throws Exception{
         Tuple4 data = AssetListContract.queryCarAsset().send();
@@ -1119,7 +1254,7 @@ public class HelloController {
         return render("Car.html", params);
     }
 
-    @GetMapping("/us")
+    @PostMapping("/us")
     @ResponseBody
     public String us() throws Exception{
         Tuple4 data = AssetListContract.queryUSdollarAsset().send();
@@ -1131,7 +1266,7 @@ public class HelloController {
         return render("US.html", params);
     }
 
-    @GetMapping("/land")
+    @PostMapping("/land")
     @ResponseBody
     public String land() throws Exception{
         Tuple4 data = AssetListContract.queryLandAsset().send();
@@ -1149,7 +1284,7 @@ public class HelloController {
 
     //java 檢查檔案存在與否
     //https://stackoverflow.com/questions/1816673/how-do-i-check-if-a-file-exists-in-java
-    static final String blockPath = "relayer-server/routes/BlockNumber";
+    static final String blockPath = "BlockNumber";
     BigInteger blockNumber; // To-Notice: corda 有用到這個變數
 
     class eblock{//https://github.com/web3j/web3j/blob/7eab3d5752fb661f58df037a11677f330b8e1117/core/src/main/java/org/web3j/protocol/core/methods/response/EthBlock.java#L59
@@ -1219,10 +1354,12 @@ public class HelloController {
     List<eblock> Blocks_Info = new Vector<>();
 
     static final int BLOCKS_INFO_TABLE_MAX_LENGTH = 5;
-    // Relayer get Blocks per 1 seconds
-    @Scheduled(fixedRate = 1000)
+    
+    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedRate = 1000)// Relayer get Blocks per 1 seconds
     public void getBlocksEth() throws Exception {
-
+        WSconnect();
+        startListenEvent();
         File f = new File(blockPath);
         if (f.exists() && f.isFile()) {
             BufferedReader br = new BufferedReader(new FileReader(f));
@@ -1283,12 +1420,12 @@ public class HelloController {
                     block.getResult().getUncles()
             ));
 
-            String filePath = "relayer-server/routes/Blocks_Info.json";
+            String filePath = "Blocks_Info.json";
 
             //java 輸出 json 格式
             ObjectMapper objectMapper = new ObjectMapper();
             if(Blocks_Info.size() > BLOCKS_INFO_TABLE_MAX_LENGTH){
-                Blocks_Info = Blocks_Info.subList(5, Blocks_Info.size()+1); //inclusive, exclusive
+                Blocks_Info = Blocks_Info.subList(5, Blocks_Info.size()); //inclusive, exclusive
             }
             //jackson default 就會是 utf8 輸出
             //https://stackoverflow.com/questions/10004241/jackson-objectmapper-with-utf-8-encoding
@@ -1323,7 +1460,7 @@ public class HelloController {
     List<Transaction> transferRes = new Vector<>();
     List<TransactionReceipt> transferRes_Receipt = new Vector<>();
     void ValidationEvent() throws Exception{
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, Validation_Address.substring(2));
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, Validation_Address);
         String encodedEventSignature = EventEncoder.encode(ValidationContract.VALIDATION_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
@@ -1343,7 +1480,7 @@ public class HelloController {
 
                     //java 輸出 json 格式
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("relayer-server/routes/transferRes.json"), transferRes);
+                    objectMapper.writeValue(new File("transferRes.json"), transferRes);
                 }
 
                 EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
@@ -1357,12 +1494,12 @@ public class HelloController {
                     transferRes_Receipt.add(transactionReceipt.getResult());
 
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("relayer-server/routes/transferRes_Receipt.json"), transferRes_Receipt);
+                    objectMapper.writeValue(new File("transferRes_Receipt.json"), transferRes_Receipt);
                 } else {
                     // try again
                 }
             }else if(results.get(1).toString() == "2"){
-
+                log.info("undefined behavior");
             }else if(results.get(1).toString() == "3"){
                 List<Transaction> landValue = new Vector<>();
                 List<TransactionReceipt> landValue_Receipt = new Vector<>();
@@ -1374,7 +1511,7 @@ public class HelloController {
 
                     //java 輸出 json 格式
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("relayer-server/routes/landValue.json"), landValue);
+                    objectMapper.writeValue(new File("landValue.json"), landValue);
                 }
 
                 EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
@@ -1383,7 +1520,7 @@ public class HelloController {
                     landValue_Receipt.add(transactionReceipt.getResult());
 
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("relayer-server/routes/landValue_Receipt.json"), landValue_Receipt);
+                    objectMapper.writeValue(new File("landValue_Receipt.json"), landValue_Receipt);
                 } else {
                     // try again
                 }
