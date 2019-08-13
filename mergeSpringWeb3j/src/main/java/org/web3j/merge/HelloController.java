@@ -284,45 +284,6 @@ public class HelloController {
     //============================================
     //=========== Test web3j function ============
     //============================================
- //   @Autowired
- //   MemberAccount memberAccount;
-    /*
-    TransactionManager transactionManager = new ClientTransactionManager(web3j, null);  // don't use empty string
-
-    String AssetList_Address = "0xfe41eb5337bd127ec171b24ebed1ee88d2c641d1";
-    AssetList AssetListContract = AssetList.load(AssetList_Address, web3j, transactionManager, new DefaultGasProvider());
-
-    String RequestList_Address = "0x8ee1b13652c8695c22a7e4372cf781fa5a540b2a";
-    RequestList RequestListContract = RequestList.load(RequestList_Address, web3j, transactionManager, new DefaultGasProvider());
-
-    String Validation_Address = "0xbf9ec3840043132efdfea54eb1850297f7fc879f";
-    TxValidation ValidationContract = TxValidation.load(Validation_Address, web3j, transactionManager, new DefaultGasProvider());
-    */
-
-    @RequestMapping("/memberApi/memberTest")
-    public MemberAccount memberTest(){
-        MemberAccount MA = new MemberAccount();
-        MA.setAddress("taipei city");
-        MA.setCellphone("09123456789");
-        MA.setEmail("test@gmail.com");
-        MA.setId(1);
-        MA.setPassword("123456789");
-        return MA;
-    }
-
-    public static class Copy{ 
-        //要 static inner class
-        // https://stackoverflow.com/questions/45586802/json-parse-error-can-not-construct-instance-of-class
-        public String object;
-        public int score;
-        public String Eth;
-        public String Corda;
-        //public Copy(){}
-        /*public Copy(String object, int score){
-            this.object = object;
-            this.score = score;
-        }*/
-    }
 
     public class testCopyRequestTx{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
         public String blockHash;
@@ -588,22 +549,6 @@ public class HelloController {
         }
     }
 
-    // String to 64 length HexString (equivalent to 32 Hex lenght)
-    public static String asciiToHex(String asciiValue)
-    {
-        if(asciiValue.length() == 66){
-            asciiValue = asciiValue.substring(2);
-        }
-        char[] chars = asciiValue.toCharArray();
-        StringBuffer hex = new StringBuffer();
-        for (int i = 0; i < chars.length; i++)
-        {
-            hex.append(Integer.toHexString((int) chars[i]));
-        }
-
-        return hex.toString() + "".join("", Collections.nCopies(32 - (hex.length()/2), "00"));
-    }
-
 
     String healthTx = "";
     //將 request 存到 eth smartcontract
@@ -626,7 +571,7 @@ public class HelloController {
 
         if(Eth != null && Corda != null){
             log.info("Eth&Corda null");
-            String healthTx = "0xd92095659bb660898017825a5c6655a372fddd53d06cd4a1a8912ded17e88649"; //index2
+            String healthTx = "0x52e2a4a680a1f393ca9da335f25568a486de76c2151d16fa10213c6439b9a4bc"; //index3
             log.info("healthTx: " + healthTx);
             log.info(String.valueOf(healthTx.length()) );
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(5000) ).send();
@@ -657,21 +602,30 @@ public class HelloController {
     }
 
 
-    public class tx{
+    public class txMod{
+        tx.getHash(), tx.getNonceRaw(), tx.getBlockHash(),
+            tx.getBlockNumberRaw(), tx.getTransactionIndexRaw(),
+            tx.getFrom(), tx.getTo(), tx.getValueRaw(), tx.getGasRaw(),
+            tx.getGasPriceRaw(), tx.getInput(), tx.getCreates(),
+            tx.getPublicKey(), tx.getRaw(), tx.getR(), tx.getS(), tx.getV()
+        public String hash;
+        public String nonce;
         public String blockHash;
         public String blockNumber;
+        public String trancsactionIndex;
         public String from;
+        public String to;
+        public String value;
         public String gas;
         public String gasPrice;
-        public String hash;
         public String input;
-        public String nonce;
-        public String to;
-        public String trancsactionIndex;
-        public String value;
-        public String v;
+        public String creates;
+        public String publicKey;
+        public String raw;
         public String r;
         public String s;
+        public String v;
+        public String assetTx;
     }
 
     public class txReceipt{
@@ -693,10 +647,10 @@ public class HelloController {
     public class withAssetTx extends Transaction{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
         public String AssetTx;
         public withAssetTx(Transaction tx, String assetTx){
-            super(tx.getHash(), tx.getNonce().toString(), tx.getBlockHash(),
-                tx.getBlockNumber().toString(), tx.getTransactionIndex().toString(),
-                tx.getFrom(), tx.getTo(), tx.getValue().toString(), tx.getGas().toString(),
-                tx.getGasPrice().toString(), tx.getInput(), tx.getCreates(),
+            super(tx.getHash(), tx.getNonceRaw(), tx.getBlockHash(),
+                tx.getBlockNumberRaw(), tx.getTransactionIndexRaw(),
+                tx.getFrom(), tx.getTo(), tx.getValueRaw(), tx.getGasRaw(),
+                tx.getGasPriceRaw(), tx.getInput(), tx.getCreates(),
                 tx.getPublicKey(), tx.getRaw(), tx.getR(), tx.getS(), tx.getV()
             );
             /*
@@ -717,11 +671,11 @@ public class HelloController {
     //範例合約 https://github.com/web3j/web3j/blob/master/codegen/src/test/resources/solidity/fibonacci/Fibonacci.sol
     //別人範例 https://blog.csdn.net/liuzhijun301/article/details/80240437
     //範例與問題 https://ethereum.stackexchange.com/questions/51958/subscribing-to-event-using-web3j
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.COPY_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
-        log.info("subscribing to event with filter");
+        log.info("subscribing RequestListCopy event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
             //log.info("event string= " + eventString.toString());
             //log.info(eventString.getTransactionHash());
@@ -732,12 +686,15 @@ public class HelloController {
                 eventString.getData(), RequestListContract.COPY_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[relayer] get copy event");
 
+            log.info(Numeric.toHexString(  ((Bytes32)results.get(0)).getValue() ));
+            log.info(results.get(0).getTypeAsString());
+            log.info(results.toString());
             //https://github.com/web3j/web3j/tree/master/core/src/main/java/org/web3j/protocol/core/methods/response (一些 eth 功能) 
             //https://github.com/web3j/web3j/search?q=ethGetTransactionByHash&unscoped_q=ethGetTransactionByHash
             //https://github.com/web3j/web3j/blob/6160282a5912ba1f35394312e6e783e040da4af3/core/src/main/java/org/web3j/protocol/core/JsonRpc2_0Web3j.java  (所有功能 all eth function )
 
             // 合約 Event 格式: event copy_event(bytes32 assetTx, bytes32 requestTx);
-            EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+            EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
                 log.info(transaction.toString());
                 log.info(transaction.getTransaction().toString());
@@ -761,9 +718,9 @@ public class HelloController {
 
             }
 
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
+                //log.info(transactionReceipt.getResult().toString());
                 //java 輸出 json 格式
                 //https://stackabuse.com/reading-and-writing-json-in-java/
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
@@ -772,30 +729,34 @@ public class HelloController {
                 Health_Receipt.add(transactionReceipt.getResult());
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("Health_Certificate.json"), Health_Receipt);
+                objectMapper.writeValue(new File("Health_Receipt.json"), Health_Receipt);
             } else {
                 // try again
             }
 
-            transaction = web3j.ethGetTransactionByHash( results.get(1).toString() ).send();
+            transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if(transaction.hasError() == false){
+                /*
+                log.info("in ethGetTransactionByHash");
                 log.info(transaction.toString());
                 log.info(transaction.getTransaction().toString());
                 log.info(transaction.getResult().toString());
+                log.info(transaction.getResult().getNonceRaw());
+                log.info(transaction.getResult().getNonce().toString());*/
+
+                CopyRequestTxs.add(new withAssetTx(transaction.getResult() , Numeric.toHexString(((Bytes32)results.get(0)).getValue())) );
+
+                //java 輸出 json 格式
                 //https://stackabuse.com/reading-and-writing-json-in-java/
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
-
-                CopyRequestTxs.add(new withAssetTx(transaction.getResult(), results.get(0).toString()));
-
-                //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
                 objectMapper.writeValue(new File("CopyRequestTxs.json"), CopyRequestTxs);
             }
 
-            transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
+            transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
+                //log.info(transactionReceipt.getResult().toString());
                 //java 輸出 json 格式
                 //https://stackabuse.com/reading-and-writing-json-in-java/
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
@@ -870,14 +831,8 @@ public class HelloController {
             //https://github.com/web3j/web3j/blob/6160282a5912ba1f35394312e6e783e040da4af3/core/src/main/java/org/web3j/protocol/core/JsonRpc2_0Web3j.java  (所有功能 all eth function )
 
             // 合約 Event 格式: event copy_event(bytes32 assetTx, bytes32 requestTx);
-            EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+            EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
-                log.info(transaction.toString());
-                log.info(transaction.getTransaction().toString());
-                log.info(transaction.getResult().toString());
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 Car_Certificate.add(transaction.getResult());
 
@@ -886,13 +841,8 @@ public class HelloController {
                 objectMapper.writeValue(new File("Car_Certificate.json"), Car_Certificate);
             }
 
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
-                //java 輸出 json 格式
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 Car_Receipt.add(transactionReceipt.getResult());
 
@@ -902,14 +852,8 @@ public class HelloController {
                 // try again
             }
 
-            transaction = web3j.ethGetTransactionByHash( results.get(1).toString() ).send();
+            transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if(transaction.hasError() == false){
-                log.info(transaction.toString());
-                log.info(transaction.getTransaction().toString());
-                log.info(transaction.getResult().toString());
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 TransferRequestTxs.add(new withAssetTx(transaction.getResult(), results.get(0).toString()));
 
@@ -918,13 +862,8 @@ public class HelloController {
                 objectMapper.writeValue(new File("TransferRequestTxs.json"), TransferRequestTxs);
             }
 
-            transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
+            transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
-                //java 輸出 json 格式
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 TransferReceipt.add(transactionReceipt.getResult());
 
@@ -987,14 +926,8 @@ public class HelloController {
             //https://github.com/web3j/web3j/blob/6160282a5912ba1f35394312e6e783e040da4af3/core/src/main/java/org/web3j/protocol/core/JsonRpc2_0Web3j.java  (所有功能 all eth function )
 
             // 合約 Event 格式: event copy_event(bytes32 assetTx, bytes32 requestTx);
-            EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+            EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
-                log.info(transaction.toString());
-                log.info(transaction.getTransaction().toString());
-                log.info(transaction.getResult().toString());
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 US_Certificate.add(transaction.getResult());
 
@@ -1003,13 +936,8 @@ public class HelloController {
                 objectMapper.writeValue(new File("US_Certificate.json"), US_Certificate);
             }
 
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
-                //java 輸出 json 格式
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 US_Receipt.add(transactionReceipt.getResult());
 
@@ -1019,14 +947,8 @@ public class HelloController {
                 // try again
             }
 
-            transaction = web3j.ethGetTransactionByHash( results.get(1).toString() ).send();
+            transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if(transaction.hasError() == false){
-                log.info(transaction.toString());
-                log.info(transaction.getTransaction().toString());
-                log.info(transaction.getResult().toString());
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 ExchangeRequestTxs.add(new withAssetTx(transaction.getResult(), results.get(0).toString()));
 
@@ -1035,13 +957,8 @@ public class HelloController {
                 objectMapper.writeValue(new File("ExchangeRequestTxs.json"), ExchangeRequestTxs);
             }
 
-            transactionReceipt = web3j.ethGetTransactionReceipt( results.get(1).toString() ).send();
+            transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
-                //java 輸出 json 格式
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 ExchangeReceipt.add(transactionReceipt.getResult());
 
@@ -1070,11 +987,10 @@ public class HelloController {
             List<Type> results = FunctionReturnDecoder.decode(
                 eventString.getData(), RequestListContract.NOTICEMSG_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[user] Alice get notice message");
-            log.info("[debug]" + results.toString());
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(500) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
-                TransactionReceipt transactionReceipt = RequestListContract.askingCordaMsg(new BigInteger(results.get(0).toString()) ).send();
+                TransactionReceipt transactionReceipt = RequestListContract.askingCordaMsg(new BigInteger(Numeric.toHexString(((Bytes32)results.get(0)).getValue())) ).send();
                 TransactionReceipt transactionReceipt2 = RequestListContract.emitEncumbranceEvent(Numeric.hexStringToByteArray(transactionReceipt.getTransactionHash())).send();
                 log.info("[debug] send 2 tx in RequestListNoticeMsgEvent");
             }
@@ -1101,14 +1017,8 @@ public class HelloController {
                 eventString.getData(), RequestListContract.ENCUMBRANCE_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[relayer] get Alice notice event");
             writeToLog("[relayer] get Alice notice event");
-            EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+            EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
-                log.info(transaction.toString());
-                log.info(transaction.getTransaction().toString());
-                log.info(transaction.getResult().toString());
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 asking_Certificate.add(transaction.getResult());
 
@@ -1117,13 +1027,8 @@ public class HelloController {
                 objectMapper.writeValue(new File("asking_Certificate.json"), asking_Certificate);
             }
 
-            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
+            EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                log.info(transactionReceipt.getResult().toString());
-                //java 輸出 json 格式
-                //https://stackabuse.com/reading-and-writing-json-in-java/
-                //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                 asking_Receipt.add(transactionReceipt.getResult());
 
@@ -1354,28 +1259,33 @@ public class HelloController {
     List<eblock> Blocks_Info = new Vector<>();
 
     static final int BLOCKS_INFO_TABLE_MAX_LENGTH = 5;
-    
+    boolean getBlockNumFileOnlyOnce = false;
+    //https://www.callicoder.com/spring-boot-task-scheduling-with-scheduled-annotation/
     @Scheduled(fixedDelay = 5000)
     @Scheduled(fixedRate = 1000)// Relayer get Blocks per 1 seconds
     public void getBlocksEth() throws Exception {
         WSconnect();
         startListenEvent();
-        File f = new File(blockPath);
-        if (f.exists() && f.isFile()) {
-            BufferedReader br = new BufferedReader(new FileReader(f));
-            BigInteger max = BigInteger.valueOf(0);
-            String st;
-            while ((st = br.readLine()) != null) {
-                System.out.println(st);
-                BigInteger temp = new BigInteger(st);
-                if (temp.compareTo(max) == 1) {
-                    max = temp;
+        
+        if(getBlockNumFileOnlyOnce == false){
+            File f = new File(blockPath);
+            if (f.exists() && f.isFile()) {
+                BufferedReader br = new BufferedReader(new FileReader(f));
+                BigInteger max = BigInteger.valueOf(0);
+                String st;
+                while ((st = br.readLine()) != null) {
+                    System.out.println(st);
+                    BigInteger temp = new BigInteger(st);
+                    if (temp.compareTo(max) == 1) {
+                        max = temp;
+                    }
                 }
+                blockNumber = max;
+            } else {
+                EthBlockNumber blockNum = web3j.ethBlockNumber().send();
+                blockNumber = blockNum.getBlockNumber();
             }
-            blockNumber = max;
-        } else {
-            EthBlockNumber blockNum = web3j.ethBlockNumber().send();
-            blockNumber = blockNum.getBlockNumber();
+            getBlockNumFileOnlyOnce = true;
         }
 
         /*
@@ -1470,11 +1380,8 @@ public class HelloController {
             // 合約 Event 格式: event validation_event(bytes32 validationTx, uint Action);
 
             if(results.get(1).toString() == "1"){
-                EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+                EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if(transaction.hasError() == false){
-                    log.info(transaction.toString());
-                    log.info(transaction.getTransaction().toString());
-                    log.info(transaction.getResult().toString());
 
                     transferRes.add(transaction.getResult());
 
@@ -1483,13 +1390,8 @@ public class HelloController {
                     objectMapper.writeValue(new File("transferRes.json"), transferRes);
                 }
 
-                EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
+                EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if (transactionReceipt.getTransactionReceipt().isPresent()) {
-                    log.info(transactionReceipt.getResult().toString());
-                    //java 輸出 json 格式
-                    //https://stackabuse.com/reading-and-writing-json-in-java/
-                    //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
-                    //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
                     transferRes_Receipt.add(transactionReceipt.getResult());
 
@@ -1504,7 +1406,7 @@ public class HelloController {
                 List<Transaction> landValue = new Vector<>();
                 List<TransactionReceipt> landValue_Receipt = new Vector<>();
 
-                EthTransaction transaction = web3j.ethGetTransactionByHash( results.get(0).toString() ).send();
+                EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if(transaction.hasError() == false){
 
                     landValue.add(transaction.getResult());
@@ -1514,7 +1416,7 @@ public class HelloController {
                     objectMapper.writeValue(new File("landValue.json"), landValue);
                 }
 
-                EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( results.get(0).toString() ).send();
+                EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
                     landValue_Receipt.add(transactionReceipt.getResult());
