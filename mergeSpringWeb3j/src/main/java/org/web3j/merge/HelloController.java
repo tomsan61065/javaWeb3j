@@ -191,7 +191,7 @@ public class HelloController {
 
     String RequestList_Address = "0x1ab5ec1c09c917fd4dbd104ba5fa871c9c3fcc90";
     RequestList RequestListContract = RequestList.load(RequestList_Address, web3j, transactionManager, new DefaultGasProvider());
-        
+
     String Validation_Address = "0xf742b95fdb5a1fd6361e2fa4c5b2d255484d2c01";
     TxValidation ValidationContract = TxValidation.load(Validation_Address, web3j, transactionManager, new DefaultGasProvider());
 
@@ -570,10 +570,10 @@ public class HelloController {
         log.info("ETH:" + Eth + ", Corda:" + Corda + ", AssetIndex:" + AssetIndex);
 
         if(Eth != null && Corda != null){
-            log.info("Eth&Corda null");
-            String healthTx = "0x52e2a4a680a1f393ca9da335f25568a486de76c2151d16fa10213c6439b9a4bc"; //index3
-            log.info("healthTx: " + healthTx);
-            log.info(String.valueOf(healthTx.length()) );
+            //log.info("Eth&Corda null");
+            //String healthTx = "0xfe879f0c7f1d6231afc505aaa6e7a70c014680271f75aa87479c8806bca65a1f";// index11
+            //log.info("healthTx: " + healthTx);
+            //log.info(String.valueOf(healthTx.length()) );
             PersonalUnlockAccount personalUnlockAccount = web3jAdmin.personalUnlockAccount(AliceETH, "1234", BigInteger.valueOf(5000) ).send();
             if (personalUnlockAccount.accountUnlocked()) {
                 // send a transaction
@@ -602,12 +602,7 @@ public class HelloController {
     }
 
 
-    public class txMod{
-        tx.getHash(), tx.getNonceRaw(), tx.getBlockHash(),
-            tx.getBlockNumberRaw(), tx.getTransactionIndexRaw(),
-            tx.getFrom(), tx.getTo(), tx.getValueRaw(), tx.getGasRaw(),
-            tx.getGasPriceRaw(), tx.getInput(), tx.getCreates(),
-            tx.getPublicKey(), tx.getRaw(), tx.getR(), tx.getS(), tx.getV()
+    public class Tx{
         public String hash;
         public String nonce;
         public String blockHash;
@@ -625,25 +620,56 @@ public class HelloController {
         public String r;
         public String s;
         public String v;
-        public String assetTx;
+        public String AssetTx;
+
+        public Tx(Transaction tx){
+            this.hash = tx.getHash();
+            this.nonce = tx.getNonce().toString();
+            this.blockHash = tx.getBlockHash();
+            this.blockNumber = tx.getBlockNumber().toString();
+            this.trancsactionIndex = tx.getTransactionIndex().toString();
+            this.from = tx.getFrom();
+            this.to = tx.getTo();
+            this.value = tx.getValue().toString();
+            this.gas = tx.getGas().toString();
+            this.gasPrice = tx.getGasPrice().toString();
+            this.input = tx.getInput();
+            this.creates = tx.getCreates();
+            this.publicKey = tx.getPublicKey();
+            this.raw = tx.getRaw();
+            this.r = tx.getR();
+            this.s = tx.getS();
+            this.v = "0x" + Long.toHexString(tx.getV());
+        }
     }
 
     public class txReceipt{
-        public String status;
+        public boolean status;
         public String transactionHash;
         public String transactionIndex;
         public String blockHash;
         public String blockNumber;
         public String contractAddress;
         public String cumulativeGasUsed;
-        public String logs;
+        public List<Log> logs;
+        public txReceipt(TransactionReceipt txR) {
+            if(txR.getStatus().equals("0x1")){
+                this.status = true;
+            }else{
+                this.status = false;
+            }
+            this.transactionHash = txR.getTransactionHash();
+            this.transactionIndex = txR.getTransactionIndex().toString();
+            this.blockHash = txR.getBlockHash();
+            this.blockNumber = txR.getBlockNumber().toString();
+            this.contractAddress = txR.getContractAddress();
+            this.cumulativeGasUsed = txR.getCumulativeGasUsed().toString();
+            this.logs = txR.getLogs();
+        }
     }
 
-    //Listen Request List Copy Event
-    List<Transaction> Health_Certificate = new Vector<>(); 
-    //https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_gettransactionbyhash
-    //https://github.com/web3j/web3j/blob/9ac2c051ad9fcb54c57b5ebf3431952bf2f64884/core/src/main/java/org/web3j/protocol/core/methods/response/Transaction.java
-    List<TransactionReceipt> Health_Receipt = new Vector<>();
+    
+    /*
     public class withAssetTx extends Transaction{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
         public String AssetTx;
         public withAssetTx(Transaction tx, String assetTx){
@@ -653,17 +679,28 @@ public class HelloController {
                 tx.getGasPriceRaw(), tx.getInput(), tx.getCreates(),
                 tx.getPublicKey(), tx.getRaw(), tx.getR(), tx.getS(), tx.getV()
             );
-            /*
-                String hash, String nonce, String blockHash, String blockNumber,
-                String transactionIndex, String from, String to, String value,
-                String gas, String gasPrice, String input, String creates,
-                String publicKey, String raw, String r, String s, long v
-            */
+
+            //    String hash, String nonce, String blockHash, String blockNumber,
+            //    String transactionIndex, String from, String to, String value,
+            //    String gas, String gasPrice, String input, String creates,
+            //    String publicKey, String raw, String r, String s, long v
+
+            AssetTx = assetTx;
+        }
+    }*/
+    public class withAssetTx extends Tx{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
+        public String AssetTx;
+        public withAssetTx(Transaction tx, String assetTx){
+            super(tx);
+
+            //    String hash, String nonce, String blockHash, String blockNumber,
+            //    String transactionIndex, String from, String to, String value,
+            //    String gas, String gasPrice, String input, String creates,
+            //    String publicKey, String raw, String r, String s, long v
             AssetTx = assetTx;
         }
     }
-    List<withAssetTx> CopyRequestTxs = new Vector<>();
-    List<TransactionReceipt> CopyReceipt = new Vector<>();
+    
 
     void RequestListCopyEvent() throws Exception{
     //官方文件 https://web3j.readthedocs.io/en/latest/filters.html#topic-filters-and-evm-events
@@ -677,6 +714,14 @@ public class HelloController {
         filter.addSingleTopic(encodedEventSignature);
         log.info("subscribing RequestListCopy event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
+            //Listen Request List Copy Event
+            List<Tx> Health_Certificate = new Vector<>();
+            //https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_gettransactionbyhash
+            //https://github.com/web3j/web3j/blob/9ac2c051ad9fcb54c57b5ebf3431952bf2f64884/core/src/main/java/org/web3j/protocol/core/methods/response/Transaction.java
+            List<txReceipt> Health_Receipt = new Vector<>();
+            List<withAssetTx> CopyRequestTxs = new Vector<>();
+            List<txReceipt> CopyReceipt = new Vector<>();
+
             //log.info("event string= " + eventString.toString());
             //log.info(eventString.getTransactionHash());
             
@@ -686,9 +731,9 @@ public class HelloController {
                 eventString.getData(), RequestListContract.COPY_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
             log.info("[relayer] get copy event");
 
-            log.info(Numeric.toHexString(  ((Bytes32)results.get(0)).getValue() ));
-            log.info(results.get(0).getTypeAsString());
-            log.info(results.toString());
+            //log.info(Numeric.toHexString(  ((Bytes32)results.get(0)).getValue() ));
+            //log.info(results.get(0).getTypeAsString());
+            //log.info(results.toString());
             //https://github.com/web3j/web3j/tree/master/core/src/main/java/org/web3j/protocol/core/methods/response (一些 eth 功能) 
             //https://github.com/web3j/web3j/search?q=ethGetTransactionByHash&unscoped_q=ethGetTransactionByHash
             //https://github.com/web3j/web3j/blob/6160282a5912ba1f35394312e6e783e040da4af3/core/src/main/java/org/web3j/protocol/core/JsonRpc2_0Web3j.java  (所有功能 all eth function )
@@ -696,18 +741,18 @@ public class HelloController {
             // 合約 Event 格式: event copy_event(bytes32 assetTx, bytes32 requestTx);
             EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
-                log.info(transaction.toString());
-                log.info(transaction.getTransaction().toString());
-                log.info(transaction.getResult().toString());
+                //log.info(transaction.toString());
+                //log.info(transaction.getTransaction().toString());
+                //log.info(transaction.getResult().toString());
                 //https://stackabuse.com/reading-and-writing-json-in-java/
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
-                Health_Certificate.add(transaction.getResult());
+                Health_Certificate.add(new Tx(transaction.getResult()));
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("Health_Certificate.json"), Health_Certificate);
+                objectMapper.writeValue(new File("share/Health_Certificate.json"), Health_Certificate);
 
                 /*
                 let filePath = 'relayer-server/routes/Health_Certificate.json';
@@ -721,15 +766,21 @@ public class HelloController {
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
                 //log.info(transactionReceipt.getResult().toString());
+                //log.info(transactionReceipt.getResult().getStatus());
+                //if(transactionReceipt.getResult().getStatus().equals("0x1")){
+                //    log.info("True");
+                //}else{
+                //    log.info("false");
+                //}
                 //java 輸出 json 格式
                 //https://stackabuse.com/reading-and-writing-json-in-java/
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
-                Health_Receipt.add(transactionReceipt.getResult());
+                Health_Receipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("Health_Receipt.json"), Health_Receipt);
+                objectMapper.writeValue(new File("share/Health_Receipt.json"), Health_Receipt);
             } else {
                 // try again
             }
@@ -751,7 +802,7 @@ public class HelloController {
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("CopyRequestTxs.json"), CopyRequestTxs);
+                objectMapper.writeValue(new File("share/CopyRequestTxs.json"), CopyRequestTxs);
             }
 
             transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
@@ -762,10 +813,10 @@ public class HelloController {
                 //https://www.mkyong.com/java/how-to-convert-java-object-to-from-json-jackson/
                 //https://stackoverflow.com/questions/43981487/how-to-append-object-to-existing-json-file-with-jackson 問題在於不存的話
 
-                CopyReceipt.add(transactionReceipt.getResult());
+                CopyReceipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("CopyReceipt.json"), CopyReceipt);
+                objectMapper.writeValue(new File("share/CopyReceipt.json"), CopyReceipt);
             } else {
                 // try again
             }
@@ -805,20 +856,17 @@ public class HelloController {
 
 
     //Listen Request List Transfer Event
-    List<Transaction> Car_Certificate = new Vector<>(); 
-    List<TransactionReceipt> Car_Receipt = new Vector<>();
-    List<withAssetTx> TransferRequestTxs = new Vector<>();
-    List<TransactionReceipt> TransferReceipt = new Vector<>();
-
     void RequestListTransferEvent() throws Exception{
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.TRANSFER_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
-        log.info("subscribing to event with filter");
+        log.info("subscribing RequestListTransfer event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
-            //log.info("event string= " + eventString.toString());
-            //log.info(eventString.getTransactionHash());
+            List<Tx> Car_Certificate = new Vector<>();
+            List<txReceipt> Car_Receipt = new Vector<>();
+            List<withAssetTx> TransferRequestTxs = new Vector<>();
+            List<txReceipt> TransferReceipt = new Vector<>();
             
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
@@ -834,20 +882,20 @@ public class HelloController {
             EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
 
-                Car_Certificate.add(transaction.getResult());
+                Car_Certificate.add(new Tx(transaction.getResult()));
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("Car_Certificate.json"), Car_Certificate);
+                objectMapper.writeValue(new File("share/Car_Certificate.json"), Car_Certificate);
             }
 
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                Car_Receipt.add(transactionReceipt.getResult());
+                Car_Receipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("Car_Receipt.json"), Car_Receipt);
+                objectMapper.writeValue(new File("share/Car_Receipt.json"), Car_Receipt);
             } else {
                 // try again
             }
@@ -859,16 +907,16 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("TransferRequestTxs.json"), TransferRequestTxs);
+                objectMapper.writeValue(new File("share/TransferRequestTxs.json"), TransferRequestTxs);
             }
 
             transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                TransferReceipt.add(transactionReceipt.getResult());
+                TransferReceipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("TransferReceipt.json"), TransferReceipt);
+                objectMapper.writeValue(new File("share/TransferReceipt.json"), TransferReceipt);
             } else {
                 // try again
             }
@@ -900,20 +948,17 @@ public class HelloController {
 
 
     //Listen Request List Exchange Event
-    List<Transaction> US_Certificate = new Vector<>(); 
-    List<TransactionReceipt> US_Receipt = new Vector<>();
-    List<withAssetTx> ExchangeRequestTxs = new Vector<>();
-    List<TransactionReceipt> ExchangeReceipt = new Vector<>();
-
     void RequestListExchangeEvent() throws Exception{
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.EXCHANGE_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
-        log.info("subscribing to event with filter");
+        log.info("subscribing RequestListExchange event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
-            //log.info("event string= " + eventString.toString());
-            //log.info(eventString.getTransactionHash());
+            List<Tx> US_Certificate = new Vector<>();
+            List<txReceipt> US_Receipt = new Vector<>();
+            List<withAssetTx> ExchangeRequestTxs = new Vector<>();
+            List<txReceipt> ExchangeReceipt = new Vector<>();
             
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
@@ -929,20 +974,20 @@ public class HelloController {
             EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
 
-                US_Certificate.add(transaction.getResult());
+                US_Certificate.add(new Tx(transaction.getResult()));
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("US_Certificate.json"), US_Certificate);
+                objectMapper.writeValue(new File("share/US_Certificate.json"), US_Certificate);
             }
 
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                US_Receipt.add(transactionReceipt.getResult());
+                US_Receipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("US_Receipt.json"), US_Receipt);
+                objectMapper.writeValue(new File("share/US_Receipt.json"), US_Receipt);
             } else {
                 // try again
             }
@@ -954,16 +999,16 @@ public class HelloController {
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("ExchangeRequestTxs.json"), ExchangeRequestTxs);
+                objectMapper.writeValue(new File("share/ExchangeRequestTxs.json"), ExchangeRequestTxs);
             }
 
             transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(1)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                ExchangeReceipt.add(transactionReceipt.getResult());
+                ExchangeReceipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("ExchangeReceipt.json"), ExchangeReceipt);
+                objectMapper.writeValue(new File("share/ExchangeReceipt.json"), ExchangeReceipt);
             } else {
                 // try again
             }
@@ -973,7 +1018,7 @@ public class HelloController {
 
 
     void RequestListNoticeMsgEvent() throws Exception{
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.NOTICEMSG_EVENT);
         filter.addSingleTopic(encodedEventSignature);
@@ -997,19 +1042,15 @@ public class HelloController {
         });
     }
 
-
-    List<Transaction> asking_Certificate = new Vector<>(); 
-    List<TransactionReceipt> asking_Receipt = new Vector<>();
-
     void RequestListEncumbranceEvent()throws Exception{
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, RequestList_Address);
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, RequestList_Address);
         // Event event = new Event("copy_event", Arrays.asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>() {}));
         String encodedEventSignature = EventEncoder.encode(RequestListContract.ENCUMBRANCE_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
-        log.info("subscribing to event with filter");
+        log.info("subscribing RequestListEncumbrance event with filter");
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
-            //log.info("event string= " + eventString.toString());
-            //log.info(eventString.getTransactionHash());
+            List<Tx> asking_Certificate = new Vector<>();
+            List<txReceipt> asking_Receipt = new Vector<>();
             
             //拿到 return 的 parameters
             //https://github.com/web3j/web3j/blob/master/integration-tests/src/test/java/org/web3j/protocol/scenarios/EventFilterIT.java
@@ -1020,20 +1061,20 @@ public class HelloController {
             EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if(transaction.hasError() == false){
 
-                asking_Certificate.add(transaction.getResult());
+                asking_Certificate.add(new Tx(transaction.getResult()));
 
                 //java 輸出 json 格式
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("asking_Certificate.json"), asking_Certificate);
+                objectMapper.writeValue(new File("share/asking_Certificate.json"), asking_Certificate);
             }
 
             EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
             if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                asking_Receipt.add(transactionReceipt.getResult());
+                asking_Receipt.add(new txReceipt(transactionReceipt.getResult()));
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.writeValue(new File("asking_Receipt.json"), asking_Receipt);
+                objectMapper.writeValue(new File("share/asking_Receipt.json"), asking_Receipt);
             } else {
                 // try again
             }
@@ -1189,7 +1230,7 @@ public class HelloController {
 
     //java 檢查檔案存在與否
     //https://stackoverflow.com/questions/1816673/how-do-i-check-if-a-file-exists-in-java
-    static final String blockPath = "BlockNumber";
+    static final String blockPath = "share/BlockNumber";
     BigInteger blockNumber; // To-Notice: corda 有用到這個變數
 
     class eblock{//https://github.com/web3j/web3j/blob/7eab3d5752fb661f58df037a11677f330b8e1117/core/src/main/java/org/web3j/protocol/core/methods/response/EthBlock.java#L59
@@ -1309,28 +1350,28 @@ public class HelloController {
             log.info("[Relayer] Get block #" + blockNumber + " from Ethereum.");
             writeToLog("[Relayer] Get block #" + blockNumber + " from Ethereum.");
             Blocks_Info.add(new eblock(
-                    block.getResult().getDifficulty().toString(),
-                    block.getResult().getExtraData(),
-                    block.getResult().getGasLimit().toString(),
-                    block.getResult().getGasUsed().toString(),
-                    block.getResult().getHash(),
-                    block.getResult().getLogsBloom(),
-                    block.getResult().getMiner(),
-                    block.getResult().getNonce().toString(),
-                    block.getResult().getNumber().toString(),
-                    block.getResult().getParentHash(),
-                    block.getResult().getReceiptsRoot(),
-                    block.getResult().getSha3Uncles(),
-                    block.getResult().getSize().toString(),
-                    block.getResult().getStateRoot(),
-                    block.getResult().getTimestamp().toString(),
-                    block.getResult().getTotalDifficulty().toString(),
-                    block.getResult().getTransactions(),
-                    block.getResult().getTransactionsRoot(),
-                    block.getResult().getUncles()
+                block.getResult().getDifficulty().toString(),
+                block.getResult().getExtraData(),
+                block.getResult().getGasLimit().toString(),
+                block.getResult().getGasUsed().toString(),
+                block.getResult().getHash(),
+                block.getResult().getLogsBloom(),
+                block.getResult().getMiner(),
+                block.getResult().getNonce().toString(),
+                block.getResult().getNumber().toString(),
+                block.getResult().getParentHash(),
+                block.getResult().getReceiptsRoot(),
+                block.getResult().getSha3Uncles(),
+                block.getResult().getSize().toString(),
+                block.getResult().getStateRoot(),
+                block.getResult().getTimestamp().toString(),
+                block.getResult().getTotalDifficulty().toString(),
+                block.getResult().getTransactions(),
+                block.getResult().getTransactionsRoot(),
+                block.getResult().getUncles()
             ));
 
-            String filePath = "Blocks_Info.json";
+            String filePath = "share/Blocks_Info.json";
 
             //java 輸出 json 格式
             ObjectMapper objectMapper = new ObjectMapper();
@@ -1367,13 +1408,14 @@ public class HelloController {
         });
     };*/
 
-    List<Transaction> transferRes = new Vector<>();
-    List<TransactionReceipt> transferRes_Receipt = new Vector<>();
+    
     void ValidationEvent() throws Exception{
-        EthFilter filter = new EthFilter(DefaultBlockParameterName.EARLIEST, DefaultBlockParameterName.LATEST, Validation_Address);
+        EthFilter filter = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, Validation_Address);
         String encodedEventSignature = EventEncoder.encode(ValidationContract.VALIDATION_EVENT_EVENT);
         filter.addSingleTopic(encodedEventSignature);
         web3j.ethLogFlowable(filter).subscribe(eventString -> {
+            List<Tx> transferRes = new Vector<>();
+            List<txReceipt> transferRes_Receipt = new Vector<>();
 
             List<Type> results = FunctionReturnDecoder.decode(
                     eventString.getData(), RequestListContract.COPY_EVENT_EVENT.getNonIndexedParameters()); //event class 的 function，看 https://github.com/web3j/web3j/blob/master/abi/src/main/java/org/web3j/abi/datatypes/Event.java
@@ -1383,46 +1425,46 @@ public class HelloController {
                 EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if(transaction.hasError() == false){
 
-                    transferRes.add(transaction.getResult());
+                    transferRes.add(new Tx(transaction.getResult()));
 
                     //java 輸出 json 格式
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("transferRes.json"), transferRes);
+                    objectMapper.writeValue(new File("share/transferRes.json"), transferRes);
                 }
 
                 EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                    transferRes_Receipt.add(transactionReceipt.getResult());
+                    transferRes_Receipt.add(new txReceipt(transactionReceipt.getResult()));
 
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("transferRes_Receipt.json"), transferRes_Receipt);
+                    objectMapper.writeValue(new File("share/transferRes_Receipt.json"), transferRes_Receipt);
                 } else {
                     // try again
                 }
             }else if(results.get(1).toString() == "2"){
                 log.info("undefined behavior");
             }else if(results.get(1).toString() == "3"){
-                List<Transaction> landValue = new Vector<>();
-                List<TransactionReceipt> landValue_Receipt = new Vector<>();
+                List<Tx> landValue = new Vector<>();
+                List<txReceipt> landValue_Receipt = new Vector<>();
 
                 EthTransaction transaction = web3j.ethGetTransactionByHash( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if(transaction.hasError() == false){
 
-                    landValue.add(transaction.getResult());
+                    landValue.add(new Tx(transaction.getResult()));
 
                     //java 輸出 json 格式
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("landValue.json"), landValue);
+                    objectMapper.writeValue(new File("share/landValue.json"), landValue);
                 }
 
                 EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt( Numeric.toHexString(((Bytes32)results.get(0)).getValue()) ).send();
                 if (transactionReceipt.getTransactionReceipt().isPresent()) {
 
-                    landValue_Receipt.add(transactionReceipt.getResult());
+                    landValue_Receipt.add(new txReceipt(transactionReceipt.getResult()));
 
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.writeValue(new File("landValue_Receipt.json"), landValue_Receipt);
+                    objectMapper.writeValue(new File("share/landValue_Receipt.json"), landValue_Receipt);
                 } else {
                     // try again
                 }
