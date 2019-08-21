@@ -148,7 +148,7 @@ public class HelloController {
 
     private static final Logger log = LoggerFactory.getLogger(Application.class);
 
-    //可能有連練問題，WS會斷掉
+    //連接 WebSocket，只觸發一次。可能有連練問題，WS會斷掉
     boolean onlyTriggerOnce = false;
     //避免 websocket 因為無回應就斷開 https://github.com/TooTallNate/Java-WebSocket/wiki/Lost-connection-detection 可參考
     private void WSconnect() throws Exception{
@@ -162,6 +162,7 @@ public class HelloController {
         webSocketService.connect();
     }
 
+    //啟動監聽 function，但只觸發一次
     boolean onlyListenOnce = false;
     private void startListenEvent() throws Exception{
         if(onlyListenOnce == false){
@@ -178,14 +179,9 @@ public class HelloController {
         ValidationEvent();
     }
 
-
+    
     String NotaryAgent = "0x76ac34807210d52fcbfc0412cf4da5c672214752";
 
-    //ContractGasProvider contractGasProvider = new DefaultGasProvider();
-    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - Smart contract deployed to address 0x8d03da762abd76143c633445bce072eb0544b0aa
-    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - assetContract address 0xe3f364b65b0e739d49c0b4fb9bfd4f309311d4aa
-    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - requestContract address 0x1ab5ec1c09c917fd4dbd104ba5fa871c9c3fcc90
-    //18:40:28.162 [http-nio-8080-exec-5] INFO  org.web3j.merge.Application - txContract address 0xf742b95fdb5a1fd6361e2fa4c5b2d255484d2c01
     String AssetList_Address = "0xe3f364b65b0e739d49c0b4fb9bfd4f309311d4aa";
     AssetList AssetListContract = AssetList.load(AssetList_Address, web3j, transactionManager, new DefaultGasProvider());
 
@@ -211,6 +207,8 @@ public class HelloController {
         WSconnect();
         startListenEvent();
         /*
+        以下測試官方 web3j example
+
         log.info("Connected to Ethereum client version: "
                 + web3j.web3ClientVersion().send().getWeb3ClientVersion());
 
@@ -284,7 +282,6 @@ public class HelloController {
     //============================================
     //=========== Test web3j function ============
     //============================================
-
     public class testCopyRequestTx{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
         public String blockHash;
         public String blockNumber;
@@ -529,6 +526,9 @@ public class HelloController {
 
         return object;
     }
+    //============================================
+    //=========== End of test function ===========
+    //============================================
 
 
 
@@ -601,7 +601,7 @@ public class HelloController {
         return "true";
     }
 
-
+    //因為前端需求才客製化 Transaction class，不然用內建的就可
     public class Tx{
         public String hash;
         public String nonce;
@@ -670,7 +670,7 @@ public class HelloController {
 
     
     /*
-    public class withAssetTx extends Transaction{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
+    public class withAssetTx extends Transaction{ // 這個就是 web3j 內建的 TransactionReceipt 內容
         public String AssetTx;
         public withAssetTx(Transaction tx, String assetTx){
             super(tx.getHash(), tx.getNonceRaw(), tx.getBlockHash(),
@@ -688,7 +688,8 @@ public class HelloController {
             AssetTx = assetTx;
         }
     }*/
-    public class withAssetTx extends Tx{ // 這個就是 web3j 內建的 TransactionReceipt 內容惹
+
+    public class withAssetTx extends Tx{ 
         public String AssetTx;
         public withAssetTx(Transaction tx, String assetTx){
             super(tx);
@@ -1238,7 +1239,7 @@ public class HelloController {
         public String extraData;
         public String gasLimit;
         public String gasUsed;
-        public String hash; //To-Notice: 本來有兩個 hash
+        public String hash; //To-Notice: JS 的本來有兩個 hash
         public String logsBloom;
         public String miner;
         public String nonce;
@@ -1259,7 +1260,7 @@ public class HelloController {
             String extraData,
             String gasLimit,
             String gasUsed,
-            String hash, //To-Notice: 本來有兩個 hash
+            String hash, 
             String logsBloom,
             String miner,
             String nonce,
@@ -1271,7 +1272,7 @@ public class HelloController {
             String stateRoot,
             String timestamp,
             String totalDifficulty,
-            List<EthBlock.TransactionResult> transactions, //To-Notice
+            List<EthBlock.TransactionResult> transactions,
             String transactionsRoot,
             List<String> uncles
         ){
